@@ -97,4 +97,6 @@ dependencies:
     - werkzeug==2.1.0
     - wrapt==1.14.0
     - zipp==3.7.0
+variables:
+  LD_LIBRARY_PATH: /usr/local/cuda-11.6/lib64::/usr/local/cuda-11.6/lib64:/home/ugrads/majors/mnj98/anaconda3/envs/movenv/lib
 prefix: /home/ugrads/majors/mnj98/anaconda3/envs/movenv

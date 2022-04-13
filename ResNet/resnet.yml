@@ -66,4 +66,6 @@ dependencies:
     - werkzeug==2.1.1
     - wrapt==1.14.0
     - zipp==3.8.0
+variables:
+  LD_LIBRARY_PATH: :/home/ugrads/majors/mnj98/anaconda3/envs/resnet/lib
 prefix: /home/ugrads/majors/mnj98/anaconda3/envs/resnet
