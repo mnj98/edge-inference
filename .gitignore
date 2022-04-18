@@ -1,2 +1,9 @@
 vid2depth/kitti-raw-uncompressed/
 tf-wheel/tensorflow-2.8.0-cp39-cp39-linux_aarch64.whl
+darknet-yolo/yolov3.weights
+darknet-yolo/yolov3-tiny.weights
+darknet-yolo/darknet
+darknet-yolo/libdarknet.a
+darknet-yolo/libdarknet.so
+darknet-yolo/obj/
+darknet-yolo/predictions.jpg
