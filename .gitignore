@@ -1,2 +1,5 @@
 vid2depth/kitti-raw-uncompressed/
 tf-wheel/tensorflow-2.8.0-cp39-cp39-linux_aarch64.whl
+vid2depth/__pycache__/
+vid2depth/ops/__pycache__/
+vid2depth/output/
