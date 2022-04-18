@@ -9,7 +9,7 @@ with tf.io.gfile.GFile('labels.txt') as f:
 
 def main():
     print("MAIN")
-    model = load_movinet_from_hub('a5', 'base', hub_version=3)
+    model = load_movinet_from_hub('a0', 'base', hub_version=3)
     print(model)
     
     video = load_gif(sys.argv[1], image_size=(172, 172))
