@@ -6,6 +6,8 @@ dependencies:
   - _openmp_mutex=4.5=1_gnu
   - ca-certificates=2022.3.29=h06a4308_0
   - certifi=2021.10.8=py37h06a4308_2
+  - cudatoolkit=11.3.1=h2bc3f7f_2
+  - cudnn=8.2.1=cuda11.3_0
   - ld_impl_linux-64=2.35.1=h7274673_9
   - libffi=3.3=he6710b0_2
   - libgcc-ng=9.3.0=h5101ec6_17

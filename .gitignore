@@ -1,1 +1,4 @@
 vid2depth/kitti-raw-uncompressed/
+vid2depth/output/
+vid2depth/__pycache__/
+vid2depth/ops/__pycache__/
