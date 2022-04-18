@@ -7,3 +7,7 @@ darknet-yolo/libdarknet.a
 darknet-yolo/libdarknet.so
 darknet-yolo/obj/
 darknet-yolo/predictions.jpg
+vid2depth/__pycache__/
+vid2depth/inference/
+vid2depth/ops/__pycache__/
+vid2depth/trained-model/
