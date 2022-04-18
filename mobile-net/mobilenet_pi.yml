@@ -1,0 +1,36 @@
+name: mobilenet
+channels:
+  - conda-forge
+dependencies:
+  - _openmp_mutex=4.5=1_gnu
+  - bzip2=1.0.8=hf897c2e_4
+  - ca-certificates=2021.10.8=h4fd8a4c_0
+  - ld_impl_linux-aarch64=2.36.1=h02ad14f_2
+  - libffi=3.4.2=h3557bc0_5
+  - libgcc-ng=11.2.0=hf1cc4e7_15
+  - libgomp=11.2.0=hf1cc4e7_15
+  - libnsl=2.0.0=hf897c2e_0
+  - libuuid=2.32.1=hf897c2e_1000
+  - libzlib=1.2.11=h4e544f5_1014
+  - ncurses=6.3=headf329_1
+  - openssl=3.0.2=h4e544f5_1
+  - pip=22.0.4=pyhd8ed1ab_0
+  - python=3.9.12=h5016f1d_1_cpython
+  - python_abi=3.9=2_cp39
+  - readline=8.1=h1a49cc3_0
+  - setuptools=62.1.0=py39ha65689a_0
+  - sqlite=3.38.2=hc74f5b8_0
+  - tk=8.6.12=hd8af866_0
+  - tzdata=2022a=h191b570_0
+  - wheel=0.37.1=pyhd8ed1ab_0
+  - xz=5.2.5=h6dd45c4_1
+  - zlib=1.2.11=h4e544f5_1014
+  - pip:
+    - certifi==2021.10.8
+    - charset-normalizer==2.0.12
+    - idna==3.3
+    - requests==2.27.1
+    - six==1.16.0
+    - tensorflow==2.8.0
+    - urllib3==1.26.9
+prefix: /home/pi/miniforge3/envs/mobilenet
