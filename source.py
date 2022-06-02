@@ -9,10 +9,15 @@ cap = cv2.VideoCapture(sys.argv[1])
 
 #client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 #client_socket.connect(('192.168.122.235', 1234))
-host = socket.gethostbyname(socket.gethostname())
+hostname = socket.gethostname()
+print('hostname: ', hostname)
+
+host = socket.gethostbyname_ex(socket.gethostname())[2][1]
+#host = socket.gethostbyname(hostname)
+print('host: ', host)
 port = 1234
 server_socket = socket.create_server((host, port))
-
+print("server socket ", server_socket)
 print('waiting at ', host, ' ', port)
 server_socket.listen()
 conn, addr = server_socket.accept()
@@ -29,7 +34,7 @@ while cap.isOpened():
     # Send form byte array: frame size + frame content
     conn.sendall(struct.pack("L", len(data)) + data)
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+#    if cv2.waitKey(1) & 0xFF == ord('q'):
+#        break
 
 cap.release()
