@@ -22,8 +22,11 @@ print('waiting at ', host, ' ', port)
 server_socket.listen()
 conn, addr = server_socket.accept()
 
+num_sent_frames = 0
+num_frames_to_send = int(sys.argv[2])
 print('connected to ', addr)
-while cap.isOpened():
+while cap.isOpened() and num_sent_frames < num_frames_to_send:
+    num_sent_frames += 1
     _, frame = cap.read()
 
     memfile = BytesIO()
@@ -36,5 +39,6 @@ while cap.isOpened():
 
 #    if cv2.waitKey(1) & 0xFF == ord('q'):
 #        break
-
+conn.shutdown(socket.SHUT_RDWR)
+conn.close()
 cap.release()
