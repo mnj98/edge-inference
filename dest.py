@@ -31,48 +31,49 @@ payload_size = struct.calcsize("L")
 #s.listen(10)
 
 
-while 1:
-    print("waiting for connection")
-    #conn, addr = s.accept()
-    print('accepted connection')
-    count = 0
-    while 1:
+print("waiting for connection")
+#conn, addr = s.accept()
+print('accepted connection')
+count = 0
+num_sent_frames = 0
+num_frames_to_send = int(sys.argv[2])
+while num_sent_frames < num_frames_to_send:
+    num_sent_frames += 1
+    data = s.recv(payload_size)
 
-        data = s.recv(payload_size)
+    if data:
+        data_size = struct.unpack("L", data)[0]
 
-        if data:
-            data_size = struct.unpack("L", data)[0]
+        data = b''
 
-            data = b''
+        while len(data) < data_size:
+            missing_data = s.recv(data_size - len(data))
 
-            while len(data) < data_size:
-                missing_data = s.recv(data_size - len(data))
+            if missing_data:
+                data += missing_data
+            else:
+                break
 
-                if missing_data:
-                    data += missing_data
-                else:
-                    break
-
-            memfile = BytesIO(data)
-            frame = np.load(memfile, allow_pickle=True)
-            print(count, type(frame))
-            count += 1
+        memfile = BytesIO(data)
+        frame = np.load(memfile, allow_pickle=True)
+        print(count, type(frame))
+        count += 1
             
-            x = np.expand_dims(frame, axis=0)
-            x = preprocess_input(x)
-            print(type(x))
-            preds = model.predict(x)
-            print('Predicted:', decode_predictions(preds, top=3)[0])
+        x = np.expand_dims(frame, axis=0)
+        x = preprocess_input(x)
+        print(type(x))
+        preds = model.predict(x)
+        print('Predicted:', decode_predictions(preds, top=3)[0])
 
-            #print("frame????? ", type(frame)," ", frame)
-            #_, enc = cv2.imencode('.jpg', frame)
-            #cv2.imshow("r", frame)
-            #key = cv2.waitKey(1) & 0xFF
-            #if key == ord('q'):
-             #   sys.exit()
-        else:
-            s.close()
-            break
+        #print("frame????? ", type(frame)," ", frame)
+        #_, enc = cv2.imencode('.jpg', frame)
+        #cv2.imshow("r", frame)
+        #key = cv2.waitKey(1) & 0xFF
+        #if key == ord('q'):
+        #   sys.exit()
+    else:
+        s.close()
+        break
 
 
 
