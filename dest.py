@@ -37,14 +37,21 @@ print('accepted connection')
 count = 0
 num_sent_frames = 0
 num_frames_to_send = int(sys.argv[2])
+time_b4_transmission = time.time()
 while num_sent_frames < num_frames_to_send:
     num_sent_frames += 1
+    start_time = time.time()
     data = s.recv(payload_size)
-
+    end_time = time.time()
+    #print("time before recv =", start_time)
+    #print("time after recv =", end_time)
+    #print("time to recv =", end_time - start_time)
+    proc_time = time.time()
     if data:
         data_size = struct.unpack("L", data)[0]
-
+        
         data = b''
+        
 
         while len(data) < data_size:
             missing_data = s.recv(data_size - len(data))
@@ -53,17 +60,18 @@ while num_sent_frames < num_frames_to_send:
                 data += missing_data
             else:
                 break
-
+        
         memfile = BytesIO(data)
         frame = np.load(memfile, allow_pickle=True)
-        print(count, type(frame))
-        count += 1
+        print("process time =", time.time() - proc_time)
+        #print(count, type(frame))
+        #count += 1
             
-        x = np.expand_dims(frame, axis=0)
-        x = preprocess_input(x)
-        print(type(x))
-        preds = model.predict(x)
-        print('Predicted:', decode_predictions(preds, top=3)[0])
+        #x = np.expand_dims(frame, axis=0)
+        #x = preprocess_input(x)
+        #print(type(x))
+        #preds = model.predict(x)
+        #print('Predicted:', decode_predictions(preds, top=3)[0])
 
         #print("frame????? ", type(frame)," ", frame)
         #_, enc = cv2.imencode('.jpg', frame)
@@ -74,9 +82,9 @@ while num_sent_frames < num_frames_to_send:
     else:
         s.close()
         break
+    
 
-
-
+print("Total transmission time =", time_b4_transmission - time.time())
 
 
 
