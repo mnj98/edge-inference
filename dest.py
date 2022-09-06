@@ -89,7 +89,7 @@ while num_sent_frames < num_frames_to_send:
             x = Batch.Batch(preprocess_input(batch_data), BATCH_SIZE)
             #x = preprocess_input(batch)
             print("process time =", time.time() - proc_time) #print(type(x))
-            preds = model.predict(x, verbose=1, use_multiprocessing=False, workers=1, max_queue_size=1)
+            preds = model.predict(x, verbose=1, use_multiprocessing=False, workers=1, max_queue_size=1, batch_size=BATCH_SIZE)
             #print('Predicted:', decode_predictions(preds, top=3)[0])
 
             #print("frame????? ", type(frame)," ", frame)
