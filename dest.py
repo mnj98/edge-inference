@@ -49,7 +49,7 @@ batch_data = np.zeros((BATCH_SIZE, IMG_DIM_X, IMG_DIM_Y,3))
 
 time_b4_transmission = time.time()
 while num_sent_frames < num_frames_to_send:
-
+    proc_time = time.time()
     for i in range(BATCH_SIZE):
 
 
@@ -61,7 +61,7 @@ while num_sent_frames < num_frames_to_send:
         #print("time before recv =", start_time)
         #print("time after recv =", end_time)
         #print("time to recv =", end_time - start_time)
-        proc_time = time.time()
+        
         if data:
             data_size = struct.unpack("L", data)[0]
         
@@ -79,7 +79,7 @@ while num_sent_frames < num_frames_to_send:
             memfile = BytesIO(data)
             frame = np.load(memfile, allow_pickle=True)
             #print("process time =", time.time() - proc_time)
-            print(count, frame.shape)
+            #print(count, frame.shape)
             #count += 1
             
 
