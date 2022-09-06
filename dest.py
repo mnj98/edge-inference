@@ -41,7 +41,7 @@ num_sent_frames = 0
 num_frames_to_send = int(sys.argv[2])
 
 
-BATCH_SIZE = 10
+BATCH_SIZE = 30
 IMG_DIM_X = 300
 IMG_DIM_Y = 300
 
