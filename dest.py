@@ -42,42 +42,51 @@ num_frames_to_send = int(sys.argv[2])
 
 
 BATCH_SIZE = 10
+IMG_DIM_X = 300
+IMG_DIM_Y = 300
 
-
+batch_data = np.zeros((BATCH_SIZE, IMG_DIM_X, IMG_DIM_Y,3))
 
 time_b4_transmission = time.time()
 while num_sent_frames < num_frames_to_send:
-    num_sent_frames += 1
-    #start_time = time.time()
-    data = s.recv(payload_size)
-    #end_time = time.time()
-    #print("time before recv =", start_time)
-    #print("time after recv =", end_time)
-    #print("time to recv =", end_time - start_time)
-    proc_time = time.time()
-    if data:
-        data_size = struct.unpack("L", data)[0]
+
+    for i in range(BATCH_SIZE):
+
+
+
+        num_sent_frames += 1
+        #start_time = time.time()
+        data = s.recv(payload_size)
+        #end_time = time.time()
+        #print("time before recv =", start_time)
+        #print("time after recv =", end_time)
+        #print("time to recv =", end_time - start_time)
+        proc_time = time.time()
+        if data:
+            data_size = struct.unpack("L", data)[0]
         
-        data = b''
+            data = b''
         
 
-        while len(data) < data_size:
-            missing_data = s.recv(data_size - len(data))
+            while len(data) < data_size:
+                missing_data = s.recv(data_size - len(data))
 
-            if missing_data:
-                data += missing_data
-            else:
-                break
+                if missing_data:
+                    data += missing_data
+                else:
+                    break
         
-        memfile = BytesIO(data)
-        frame = np.load(memfile, allow_pickle=True)
-        #print("process time =", time.time() - proc_time)
-        print(count, frame.shape)
-        #count += 1
+            memfile = BytesIO(data)
+            frame = np.load(memfile, allow_pickle=True)
+            #print("process time =", time.time() - proc_time)
+            print(count, frame.shape)
+            #count += 1
             
-        x = np.expand_dims(frame, axis=0)
-        print(x.shape)
-        x = Batch.Batch(preprocess_input(x), 1)
+
+            batch_data[i] = frame
+        #x = np.expand_dims(frame, axis=0)
+        #print(x.shape)
+        x = Batch.Batch(preprocess_input(batch_data), BATCH_SIZE)
         #x = preprocess_input(batch)
         print("process time =", time.time() - proc_time) #print(type(x))
         preds = model.predict(x, verbose=1, use_multiprocessing=False, workers=1, max_queue_size=1)
