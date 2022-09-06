@@ -76,6 +76,7 @@ while num_sent_frames < num_frames_to_send:
         #count += 1
             
         x = np.expand_dims(frame, axis=0)
+        print(x.shape)
         x = Batch.Batch(preprocess_input(x), 1)
         #x = preprocess_input(batch)
         print("process time =", time.time() - proc_time) #print(type(x))
