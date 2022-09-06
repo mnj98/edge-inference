@@ -84,23 +84,23 @@ while num_sent_frames < num_frames_to_send:
             
 
             batch_data[i] = frame
-        #x = np.expand_dims(frame, axis=0)
-        #print(x.shape)
-        x = Batch.Batch(preprocess_input(batch_data), BATCH_SIZE)
-        #x = preprocess_input(batch)
-        print("process time =", time.time() - proc_time) #print(type(x))
-        preds = model.predict(x, verbose=1, use_multiprocessing=False, workers=1, max_queue_size=1)
-        #print('Predicted:', decode_predictions(preds, top=3)[0])
+            #x = np.expand_dims(frame, axis=0)
+            #print(x.shape)
+            x = Batch.Batch(preprocess_input(batch_data), BATCH_SIZE)
+            #x = preprocess_input(batch)
+            print("process time =", time.time() - proc_time) #print(type(x))
+            preds = model.predict(x, verbose=1, use_multiprocessing=False, workers=1, max_queue_size=1)
+            #print('Predicted:', decode_predictions(preds, top=3)[0])
 
-        #print("frame????? ", type(frame)," ", frame)
-        #_, enc = cv2.imencode('.jpg', frame)
-        #cv2.imshow("r", frame)
-        #key = cv2.waitKey(1) & 0xFF
-        #if key == ord('q'):
-        #   sys.exit()
-    else:
-        s.close()
-        break
+            #print("frame????? ", type(frame)," ", frame)
+            #_, enc = cv2.imencode('.jpg', frame)
+            #cv2.imshow("r", frame)
+            #key = cv2.waitKey(1) & 0xFF
+            #if key == ord('q'):
+            #   sys.exit()
+        else:
+            s.close()
+            break
     
 
 print("Total transmission time =", time_b4_transmission - time.time())
