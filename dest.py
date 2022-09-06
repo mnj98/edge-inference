@@ -39,12 +39,18 @@ print('accepted connection')
 count = 0
 num_sent_frames = 0
 num_frames_to_send = int(sys.argv[2])
+
+
+BATCH_SIZE = 10
+
+
+
 time_b4_transmission = time.time()
 while num_sent_frames < num_frames_to_send:
     num_sent_frames += 1
-    start_time = time.time()
+    #start_time = time.time()
     data = s.recv(payload_size)
-    end_time = time.time()
+    #end_time = time.time()
     #print("time before recv =", start_time)
     #print("time after recv =", end_time)
     #print("time to recv =", end_time - start_time)
@@ -66,14 +72,14 @@ while num_sent_frames < num_frames_to_send:
         memfile = BytesIO(data)
         frame = np.load(memfile, allow_pickle=True)
         #print("process time =", time.time() - proc_time)
-        #print(count, type(frame))
+        print(count, frame.shape)
         #count += 1
             
         x = np.expand_dims(frame, axis=0)
         x = Batch.Batch(preprocess_input(x), 1)
         #x = preprocess_input(batch)
         print("process time =", time.time() - proc_time) #print(type(x))
-        preds = model.predict(x, verbose=1, use_multiprocessing=True, workers=8, max_queue_size=1)
+        preds = model.predict(x, verbose=1, use_multiprocessing=False, workers=1, max_queue_size=1)
         #print('Predicted:', decode_predictions(preds, top=3)[0])
 
         #print("frame????? ", type(frame)," ", frame)
