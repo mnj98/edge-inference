@@ -47,11 +47,11 @@ with multiprocessing.Manager() as manager:
         batch_ids = list(map(lambda img: img['id'], batch))
         #frame = np.expand_dims(image, axis=0)
         frames = preprocess_input(batch_images)
-        preds = model.predict(frames, verbose=1)
-        print(decode_predictions(preds, top=5))
+        preds = decode_predictions(model.predict(frames, verbose=1), top = 5)
+        #print(decode_predictions(preds, top=5))
 
-        for id in batch_ids:
-            results[id] = 'Hello: ' + str(id)
+        for i in range len(batch_size):
+            results[batch_ids[i]] = preds[i]
         for e in batch_events:
             e.set()
             events.put(manager.Event())
