@@ -28,7 +28,7 @@ def main():
     image_id, image = images.get_frame()
     req = requests.post('http://localhost:1234/infer', \
         files = {'image': image}, data = {'id': image_id, 'model': 'mobilenet'})#data={'model': 'mobilenet', 'image': images.get_frame()})
-
+    print(req.json())
 
 
 if __name__ == '__main__':
