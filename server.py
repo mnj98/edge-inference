@@ -20,7 +20,7 @@ def run(req, res, events):
         req.put({'id': id, 'done_event': e, 'image': image})
         e.wait()
         r = res.pop(id)
-        print(r)
+        
         return '<p>OK!</p>'
 
     app.run(host='0.0.0.0', threaded=True,  port=1234)

@@ -3,7 +3,7 @@ import cv2
 
 class Source(object):
     def __init__(self):
-        self.video = cv2.VideoCapture("home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG")
+        self.video = cv2.VideoCapture("/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG")
 
     def __del__(self):
         self.video.release()
