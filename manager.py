@@ -42,7 +42,7 @@ with multiprocessing.Manager() as manager:
             batch.append(r)
         
         #image = r['image']
-        batch_images = list(map(lambda img: img['image'], batch))
+        batch_images = np.array(list(map(lambda img: img['image'], batch)))
         batch_events = list(map(lambda img: img['done_event'], batch))
         batch_ids = list(map(lambda img: img['id'], batch))
         #frame = np.expand_dims(image, axis=0)
