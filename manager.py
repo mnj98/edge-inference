@@ -1,3 +1,4 @@
+from asyncio import base_tasks
 import  multiprocessing
 #from multiprocessing import Process
 from random import random
@@ -33,11 +34,16 @@ with multiprocessing.Manager() as manager:
     for proc in procs:
         proc.start()
 
+    batch_size = 10
     while True:
-        r = requests.get()
+        batch = []
+        for i in range(batch_size):
+            r = requests.get()
+            batch.append(r)
+        
         image = r['image']
 
-        frame = np.expand_dims(image, axis=0)
+        #frame = np.expand_dims(image, axis=0)
         frame = preprocess_input(frame)
         preds = model.predict(frame, verbose=1)
         print(decode_predictions(preds, top=5))
