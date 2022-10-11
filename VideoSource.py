@@ -1,6 +1,7 @@
 import requests
 import cv2
 import random
+import time
 
 class Source(object):
     def __init__(self):
@@ -28,9 +29,10 @@ def main():
     
     image_id, image = images.get_frame()
     image_id = int(random.random() * 1000)
+    start = time.time()
     req = requests.post('http://localhost:1234/infer', \
         files = {'image': image}, data = {'id': image_id, 'model': 'mobilenet'})#data={'model': 'mobilenet', 'image': images.get_frame()})
-    print(req.content)
+    print(req.content, time.time() - start)
 
 
 if __name__ == '__main__':
