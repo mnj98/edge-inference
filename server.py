@@ -21,6 +21,7 @@ def run(req, res, events):
         req.put({'id': image_id, 'done_event': e, 'image': image})
         e.wait()
         r = res.pop(image_id)
+        print(r)
 
 
         
