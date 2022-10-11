@@ -50,7 +50,7 @@ with multiprocessing.Manager() as manager:
         preds = decode_predictions(model.predict(frames, verbose=1), top = 5)
         #print(decode_predictions(preds, top=5))
 
-        for i in range(len(batch_size)):
+        for i in range(batch_size):
             results[batch_ids[i]] = preds[i]
         for e in batch_events:
             e.set()
