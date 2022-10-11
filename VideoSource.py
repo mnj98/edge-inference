@@ -1,5 +1,6 @@
 import requests
 import cv2
+import random
 
 class Source(object):
     def __init__(self):
@@ -24,13 +25,12 @@ class Source(object):
 
 def main():
     images = Source()
-    num_to_send = 3
-    for i in range(num_to_send):
-        image_id, image = images.get_frame()
-        image_id = i + 1
-        req = requests.post('http://localhost:1234/infer', \
-            files = {'image': image}, data = {'id': image_id, 'model': 'mobilenet'})#data={'model': 'mobilenet', 'image': images.get_frame()})
-        print(req.content)
+    
+    image_id, image = images.get_frame()
+    image_id = int(random.random() * 1000)
+    req = requests.post('http://localhost:1234/infer', \
+        files = {'image': image}, data = {'id': image_id, 'model': 'mobilenet'})#data={'model': 'mobilenet', 'image': images.get_frame()})
+    print(req.content)
 
 
 if __name__ == '__main__':
