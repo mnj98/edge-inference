@@ -22,8 +22,8 @@ def run(req, res, events):
         e.wait()
         r = res.pop(image_id)
 
+
         
-        
-        return '<p>OK!</p>'
+        return r
 
     app.run(host='0.0.0.0', threaded=True,  port=1234)
