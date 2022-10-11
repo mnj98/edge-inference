@@ -34,7 +34,7 @@ with multiprocessing.Manager() as manager:
     for proc in procs:
         proc.start()
 
-    batch_size = 1
+    batch_size = 2
     while True:
         batch = []
         for i in range(batch_size):
