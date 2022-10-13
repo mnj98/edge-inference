@@ -2,6 +2,8 @@ import requests
 import cv2
 import random
 import time
+import numpy as np
+from ast import literal_eval
 
 class Source(object):
     def __init__(self):
@@ -26,7 +28,16 @@ class Source(object):
 
 def main():
     images = Source()
-    
+    num_to_test = 1000
+    truths_file = open('/home/pi/ImageNet/2012/2012_ground_truth_ids.txt', 'r')
+    true_classes = np.ndarray(shape=(num_to_test,), dtype='int32')
+    inf_classes = np.ndarray(shape=(num_to_test,), dtype='int32')
+
+    for i in range(num_to_test):
+        true_classes[i] = int(truths_file.readline()[1:])
+    print(true_classes)
+    print(inf_classes)
+    x = 3 / 0 
     image_id, image = images.get_frame()
     image_id = int(random.random() * 1000)
     start = time.time()
