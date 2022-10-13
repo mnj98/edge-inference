@@ -52,7 +52,7 @@ with multiprocessing.Manager() as manager:
         #print(decode_predictions(preds, top=5))
 
         for i in range(batch_size):
-            results[batch_ids[i]] = list(map(lambda pr: pr[0],preds[i]))
+            results[batch_ids[i]] = list(map(lambda pr: int(pr[0][1:]),preds[i]))
         for e in batch_events:
             e.set()
             events.put(manager.Event())
