@@ -47,12 +47,13 @@ def main():
 
 
 
-    image_id, image = images.get_frame()
+    
     #image_id = int(random.random() * 1000)
 
     start_time = time.time()
 
     for i in range(num_to_test):
+        image_id, image = images.get_frame()
         threading.Thread(target=request_inference, args=(image, image_id, i, inf_classes)).start()
         time.sleep(frame_delay - ((time.time() - start_time) % frame_delay))
 
