@@ -29,7 +29,7 @@ with multiprocessing.Manager() as manager:
     for i in range(1000):
         events.put(manager.Event())
 
-    server = multiprocessing.Process(target=qpush, args=(requests, results, events)
+    server = multiprocessing.Process(target=qpush, args=(requests, results, events))
 
     server.start()
 
