@@ -1,3 +1,4 @@
+import sys
 import requests
 import cv2
 import random
@@ -17,23 +18,26 @@ class Source(object):
     def get_frame(self):
         success, image = self.video.read()
 
-        ret, jpeg = cv2.imencode('.jpg', image)
+        ret, jpeg = cv2.imencode('.jpg', cv2.resize(image, (224,224)))
         #print(jpeg)
         #print(jpeg.tobytes())
         self.current_image_id += 1
         return (self.current_image_id - 1, jpeg.tobytes())
 
 
-def request_inference(image, id, index, result_buffer, model = 'mobilenet', url='http://localhost:1234/infer'):
+def request_inference(true_classes, image, id, index, result_buffer, model = 'mobilenet', url='http://localhost:1234/infer'):
     req = requests.post(url, files = {'image': image}, data = {'id': id, 'model': model})
     top_result = literal_eval(req.content.decode())[0]
-
+    #print('index:', index, 'true:', true_classes[index], 'res:', top_result, true_classes[index] == top_result)
     result_buffer[index] = top_result
 
 
-def main():
+def main(args):
     images = Source()
-    num_to_test = 1000
+    if len(args) == 2:
+        num_to_test = int(args[1])
+    else:
+        num_to_test = 300
     fps = 30
     frame_delay = 1 / fps 
     truths_file = open('/home/pi/ImageNet/2012/2012_ground_truth_ids.txt', 'r')
@@ -42,23 +46,27 @@ def main():
 
     for i in range(num_to_test):
         true_classes[i] = int(truths_file.readline()[1:])
-    print(true_classes)
-    print(inf_classes)
+    #print(true_classes)
+    #print(inf_classes)
 
 
 
     
     #image_id = int(random.random() * 1000)
-
+    t = time.time()
     start_time = time.time()
-
+    threads = []
     for i in range(num_to_test):
         image_id, image = images.get_frame()
-        threading.Thread(target=request_inference, args=(image, image_id, i, inf_classes)).start()
+        thread = threading.Thread(target=request_inference, args=(true_classes, image, image_id, i, inf_classes))
+        threads.append(thread)
+        thread.start()
         time.sleep(frame_delay - ((time.time() - start_time) % frame_delay))
 
-
-    print(inf_classes)
+    for thread in threads:
+        thread.join()
+    print(np.sum(inf_classes == true_classes) / num_to_test)
+    print(num_to_test / (time.time() - t))
     '''
     start = time.time()
     req = requests.post('http://localhost:1234/infer', \
@@ -68,4 +76,4 @@ def main():
 
 
 if __name__ == '__main__':
-   main()
+   main(sys.argv)
