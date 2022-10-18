@@ -16,7 +16,7 @@ model = MobileNetV3Large(weights='imagenet')
 
 
 
-def qpush(i, req, res, events):
+def qpush(req, res, events):
     run(req, res, events)
 
 
@@ -26,15 +26,14 @@ with multiprocessing.Manager() as manager:
     results = manager.dict()
     events = manager.Queue()
 
-    for i in range(100):
+    for i in range(1000):
         events.put(manager.Event())
-    i = 1
-    procs = [multiprocessing.Process(target=qpush, args=(j, requests, results, events)) for j in range(i)]
 
-    for proc in procs:
-        proc.start()
+    server = multiprocessing.Process(target=qpush, args=(requests, results, events)
 
-    batch_size = 1
+    server.start()
+
+    batch_size = 10
     while True:
         batch = []
         for i in range(batch_size):
@@ -48,7 +47,7 @@ with multiprocessing.Manager() as manager:
         #frame = np.expand_dims(image, axis=0)
         frames = preprocess_input(batch_images)
         preds = decode_predictions(model.predict(frames, verbose=1), top = 5)
-        print('preds',preds)
+        #print('preds',preds)
         #print(decode_predictions(preds, top=5))
 
         for i in range(batch_size):
