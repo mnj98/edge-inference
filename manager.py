@@ -57,7 +57,10 @@ NUM_EVENTS = 3000
 BATCH_SIZE = 10
 
 def inference_thread():
+    batch_n = 0
     while True:
+        print('batch number:', batch_n)
+        batch_n += 1
         batch = []
         for i in range(BATCH_SIZE):
             r = requests.get()
