@@ -9,6 +9,7 @@ import queue
 import threading
 import random
 import time
+import sys
 
 
 from flask import Flask, render_template, Response, request
@@ -55,7 +56,10 @@ events = queue.Queue()
 results = dict()
 
 NUM_EVENTS = 3000
-BATCH_SIZE = 10
+if len(sys.argv) == 2:
+    BATCH_SIZE = int(sys.argv[1])
+else:
+    BATCH_SIZE = 10
 
 def inference_thread():
     batch_n = 0

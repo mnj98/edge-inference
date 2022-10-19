@@ -1,3 +1,4 @@
+from http.client import RemoteDisconnected
 import sys
 import requests
 import cv2
@@ -26,10 +27,17 @@ class Source(object):
 
 
 def request_inference(true_classes, image, id, index, result_buffer, model = 'mobilenet', url='http://localhost:1234/infer'):
-    req = requests.post(url, files = {'image': image}, data = {'id': id, 'model': model})
-    top_result = literal_eval(req.content.decode())[0]
-    print('index:', index, 'true:', true_classes[index], 'res:', top_result, true_classes[index] == top_result)
-    result_buffer[index] = top_result
+    try:
+        req = requests.post(url, files = {'image': image}, data = {'id': id, 'model': model})
+        top_result = literal_eval(req.content.decode())[0]
+        print('index:', index, 'true:', true_classes[index], 'res:', top_result, true_classes[index] == top_result)
+        result_buffer[index] = top_result
+    except RemoteDisconnected:
+        print('remote disconnected error on index:', index)
+    except ConnectionError:
+        print('connection error on index:', index)
+    except:
+        print('other error on index:', index)
 
 
 def main(args):
