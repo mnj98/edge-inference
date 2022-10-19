@@ -28,7 +28,7 @@ class Source(object):
 def request_inference(true_classes, image, id, index, result_buffer, model = 'mobilenet', url='http://localhost:1234/infer'):
     req = requests.post(url, files = {'image': image}, data = {'id': id, 'model': model})
     top_result = literal_eval(req.content.decode())[0]
-    #print('index:', index, 'true:', true_classes[index], 'res:', top_result, true_classes[index] == top_result)
+    print('index:', index, 'true:', true_classes[index], 'res:', top_result, true_classes[index] == top_result)
     result_buffer[index] = top_result
 
 
