@@ -22,7 +22,7 @@ def flask_thread():
 
     @app.post('/infer')
     def inference():
-        image_id = request.values['id']
+        image_id = random.random() #request.values['id']
         model_to_use = request.values['model']
         image = request.files['image'].read()
         image = np.frombuffer(image, np.uint8)
