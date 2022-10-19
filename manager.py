@@ -8,6 +8,7 @@ import numpy as np
 import queue
 import threading
 import random
+import time
 
 
 from flask import Flask, render_template, Response, request
@@ -62,9 +63,26 @@ def inference_thread():
         print('batch number:', batch_n)
         batch_n += 1
         batch = []
-        for i in range(BATCH_SIZE):
-            r = requests.get()
-            batch.append(r)
+        #cut_off_time = time.time()
+        idx = 0
+        while idx < BATCH_SIZE:
+            try:
+                r = requests.get(timeout=1)
+                batch.append(r)
+                idx += 1
+            except:
+                if len(batch) == 0:
+                    idx = 0
+                else:
+                    break
+                
+        '''for i in range(BATCH_SIZE):
+            try:
+                r = requests.get(timeout=1)
+                batch.append(r)
+            except:
+                if len(batch) == 0:
+        '''
 
         batch_images = np.array(list(map(lambda img: img['image'], batch)))
         batch_events = list(map(lambda img: img['done_event'], batch))
@@ -75,7 +93,7 @@ def inference_thread():
         #print('preds',preds)
         #print(decode_predictions(preds, top=5))
 
-        for i in range(BATCH_SIZE):
+        for i in range(len(batch)):
             results[batch_ids[i]] = list(map(lambda pr: int(pr[0][1:]),preds[i]))
         for e in batch_events:
             e.set()
