@@ -26,12 +26,15 @@ class Source(object):
         return (self.current_image_id - 1, jpeg.tobytes())
 
 
-def request_inference(true_classes, image, id, index, result_buffer, model = 'mobilenet', url='http://localhost:1234/infer'):
+def request_inference(inference_times, true_classes, image, id, index, result_buffer, model = 'mobilenet', url='http://localhost:1234/infer'):
     try:
+        t = time.time()
         req = requests.post(url, files = {'image': image}, data = {'id': id, 'model': model})
         top_result = literal_eval(req.content.decode())[0]
-        print('index:', index, 'true:', true_classes[index], 'res:', top_result, true_classes[index] == top_result)
+        inf_time = time.time() - t
+        print('index:', index, 'true:', true_classes[index], 'res:', top_result, true_classes[index] == top_result, 'time:', inf_time)
         result_buffer[index] = top_result
+        inference_times[index] = inf_time
     except RemoteDisconnected:
         print('remote disconnected error on index:', index)
     except ConnectionError:
@@ -51,6 +54,7 @@ def main(args):
     truths_file = open('/home/pi/ImageNet/2012/2012_ground_truth_ids.txt', 'r')
     true_classes = np.ndarray(shape=(num_to_test,), dtype='int32')
     inf_classes = np.ndarray(shape=(num_to_test,), dtype='int32')
+    times = np.ndarray(shape=(num_to_test,))
 
     for i in range(num_to_test):
         true_classes[i] = int(truths_file.readline()[1:])
@@ -66,7 +70,7 @@ def main(args):
     threads = []
     for i in range(num_to_test):
         image_id, image = images.get_frame()
-        thread = threading.Thread(target=request_inference, args=(true_classes, image, image_id, i, inf_classes))
+        thread = threading.Thread(target=request_inference, args=(times, true_classes, image, image_id, i, inf_classes))
         threads.append(thread)
         thread.start()
         time.sleep(frame_delay - ((time.time() - start_time) % frame_delay))
@@ -75,6 +79,7 @@ def main(args):
         thread.join()
     print(np.sum(inf_classes == true_classes) / num_to_test)
     print(num_to_test / (time.time() - t))
+    print(np.sum(times) / num_to_test)
     '''
     start = time.time()
     req = requests.post('http://localhost:1234/infer', \
