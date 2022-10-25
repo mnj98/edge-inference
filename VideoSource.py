@@ -41,7 +41,7 @@ def request_inference( image, index, result_buffer, inference_times, model = 'mo
 
 
 def capture_loop(q, num_to_test, shape):
-    images = Source()
+    images = Source(shape)
 
     for i in range(num_to_test):
         q.put(images.get_frame())
