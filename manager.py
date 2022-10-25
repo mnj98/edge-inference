@@ -70,7 +70,7 @@ def inference_thread(model_name):
     local = threading.local()
     local.batch_n = 0
     while True:
-        print('batch number:', local.batch_n)
+        print(model_name,': batch number:', local.batch_n)
         local.batch_n += 1
         local.batch = []
         #cut_off_time = time.time()

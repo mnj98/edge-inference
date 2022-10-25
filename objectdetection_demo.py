@@ -31,13 +31,14 @@ def main():
 
 
 
-
+'''
 def load_image_into_numpy_array(path):
     image_data = tf.io.gfile.GFile(path, 'rb').read()
     image = Image.open(BytesIO(image_data))
     image_data = cv.imread(path)
     (im_width, im_height) = image.size
     return np.array(image.getdata()).reshape((1, im_height, im_width, 3)).astype(np.uint8)
+'''
 
 
 
@@ -46,8 +47,7 @@ def load_image_into_numpy_array(path):
 
 
 
-
-
+'''
 COCO17_HUMAN_POSE_KEYPOINTS = [(0, 1),
  (0, 2),
  (1, 3),
@@ -66,7 +66,7 @@ COCO17_HUMAN_POSE_KEYPOINTS = [(0, 1),
  (13, 15),
  (12, 14),
  (14, 16)]
-
+'''
 
 if __name__ == "__main__":
     main()
