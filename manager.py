@@ -56,7 +56,7 @@ keras_model_names = ['mobilenet', 'efficientnet']
 processing_functions = {'mobilenet': mobilenet.preprocess_input, 'efficientnet': efficientnet.preprocess_input}
 decode_functions = {'mobilenet': mobilenet.decode_predictions, 'efficientnet': efficientnet.decode_predictions}
 models = {'mobilenet': MobileNetV3Large(weights='imagenet'), 'efficientnet': EfficientNetB0(weights='imagenet')}
-requests = {'mobielnet': queue.Queue(), 'efficientnet': queue.Queue()}
+requests = {'mobilenet': queue.Queue(), 'efficientnet': queue.Queue()}
 events = queue.Queue()
 results = dict()
 
