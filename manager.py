@@ -99,7 +99,7 @@ def inference_thread(model_name):
         local.batch_ids = list(map(lambda img: img['id'], local.batch))
 
         local.frames = processing_functions[model_name](local.batch_images)
-        local.preds = decode_functions[model_name](local.model.predict(local.frames, verbose=1), top = 5)
+        local.preds = decode_functions[model_name](models[model_name].predict(local.frames, verbose=1), top = 5)
         #print('preds',preds)
         #print(decode_predictions(preds, top=5))
 
