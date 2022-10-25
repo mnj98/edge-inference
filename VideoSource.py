@@ -1,38 +1,34 @@
-from http.client import RemoteDisconnected
-import sys
-import requests
-import cv2
-import random
-import time
-import numpy as np
+import cv2, time, requests, threading, sys, queue
 from ast import literal_eval
-import threading
+from http.client import RemoteDisconnected
+import numpy as np
 
 class Source(object):
     def __init__(self):
-        self.video = cv2.VideoCapture("/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG")
-        self.current_image_id = 1
+        self.video = cv2.VideoCapture("/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG")#("/Users/mnj98/Desktop/ILSVRC2012_img_val/ILSVRC2012_val_%08d.JPEG")
 
     def __del__(self):
         self.video.release()
 
-    def get_frame(self):
+    def get_frame(self, index = None):
+        if index != None:
+            self.video.set(cv2.CAP_PROP_POS_FRAMES, index)
+        frame_index = int(self.video.get(cv2.CAP_PROP_POS_FRAMES))
         success, image = self.video.read()
 
         ret, jpeg = cv2.imencode('.jpg', cv2.resize(image, (224,224)))
-        #print(jpeg)
-        #print(jpeg.tobytes())
-        self.current_image_id += 1
-        return (self.current_image_id - 1, jpeg.tobytes())
+        return (frame_index, jpeg.tobytes())
 
 
-def request_inference(inference_times, true_classes, image, id, index, result_buffer, model = 'mobilenet', url='http://localhost:1234/infer'):
+def request_inference( image, index, result_buffer, inference_times, model = 'mobilenet', url='http://localhost:1234/infer'):
     try:
         t = time.time()
-        req = requests.post(url, files = {'image': image}, data = {'id': id, 'model': model})
+        #print(id, t)
+        req = requests.post(url, files = {'image': image}, data = {'model': model})
         top_result = literal_eval(req.content.decode())[0]
         inf_time = time.time() - t
-        print('index:', index, 'true:', true_classes[index], 'res:', top_result, true_classes[index] == top_result, 'time:', inf_time)
+        #print(inf_time)
+        #print('index:', index, 'true:', true_classes[index], 'res:', top_result, true_classes[index] == top_result, 'time:', inf_time)
         result_buffer[index] = top_result
         inference_times[index] = inf_time
     except RemoteDisconnected:
@@ -43,14 +39,14 @@ def request_inference(inference_times, true_classes, image, id, index, result_bu
         print('other error on index:', index)
 
 
-def main(args):
+def capture_loop(q, num_to_test):
     images = Source()
-    if len(args) == 2:
-        num_to_test = int(args[1])
-    else:
-        num_to_test = 300
-    fps = 30
-    frame_delay = 1 / fps 
+
+    for i in range(num_to_test):
+        q.put(images.get_frame())
+
+def main(num_to_test, fps):
+    frame_delay = 1/fps
     truths_file = open('/home/pi/ImageNet/2012/2012_ground_truth_ids.txt', 'r')
     true_classes = np.ndarray(shape=(num_to_test,), dtype='int32')
     inf_classes = np.ndarray(shape=(num_to_test,), dtype='int32')
@@ -58,35 +54,30 @@ def main(args):
 
     for i in range(num_to_test):
         true_classes[i] = int(truths_file.readline()[1:])
-    #print(true_classes)
-    #print(inf_classes)
 
+    image_queue = queue.Queue(maxsize=180)
+    capture_thread = threading.Thread(target=capture_loop, args=(image_queue, num_to_test))
 
-
-    
-    #image_id = int(random.random() * 1000)
-    t = time.time()
+    threads = np.ndarray(shape=(num_to_test,), dtype=threading.Thread)
+    capture_thread.start()
+    time.sleep(0.1)
+    #capture_thread.join()
     start_time = time.time()
-    threads = []
     for i in range(num_to_test):
-        image_id, image = images.get_frame()
-        thread = threading.Thread(target=request_inference, args=(times, true_classes, image, image_id, i, inf_classes))
-        threads.append(thread)
+        #print(image_queue.qsize())
+        image_id, image = image_queue.get()
+        thread = threading.Thread(target=request_inference, args=(image, image_id, inf_classes, times))
+        threads[i] = thread
         thread.start()
-        time.sleep(frame_delay - ((time.time() - start_time) % frame_delay))
+        wait = frame_delay - ((time.time() - start_time) % frame_delay)
+        time.sleep(wait)
 
     for thread in threads:
         thread.join()
-    print(np.sum(inf_classes == true_classes) / num_to_test)
-    print(num_to_test / (time.time() - t))
-    print(np.sum(times) / num_to_test)
-    '''
-    start = time.time()
-    req = requests.post('http://localhost:1234/infer', \
-        files = {'image': image}, data = {'id': image_id, 'model': 'mobilenet'})#data={'model': 'mobilenet', 'image': images.get_frame()})
-    print(req.content, time.time() - start)
-    '''
-
+    capture_thread.join()
+    print('accuracy:',np.sum(inf_classes == true_classes) / num_to_test)
+    print('fps measured:', num_to_test / (time.time() - start_time), 'input:', fps)
+    print('inf latency:', np.sum(times) / num_to_test)
 
 if __name__ == '__main__':
-   main(sys.argv)
+    main(int(sys.argv[1]), int(sys.argv[2]))
