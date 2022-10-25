@@ -95,7 +95,7 @@ def det_thread(model_name):
         boxes, scores, classes, num_detections = models['efficient_det'](batch_images)
 
         for i in range(len(batch)):
-            results[batch_ids[i]] = (boxes[i], scores[i], classes[i], num_detections[i])
+            results[batch_ids[i]] = 'ok!'#(boxes[i], scores[i], classes[i], num_detections[i])
         for e in batch_events:
             e.set()
 
