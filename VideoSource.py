@@ -45,7 +45,7 @@ def capture_loop(q, num_to_test):
     for i in range(num_to_test):
         q.put(images.get_frame())
 
-def main(num_to_test, fps):
+def main(num_to_test, fps, model):
     frame_delay = 1/fps
     truths_file = open('/home/pi/ImageNet/2012/2012_ground_truth_ids.txt', 'r')
     true_classes = np.ndarray(shape=(num_to_test,), dtype='int32')
@@ -66,7 +66,7 @@ def main(num_to_test, fps):
     for i in range(num_to_test):
         #print(image_queue.qsize())
         image_id, image = image_queue.get()
-        thread = threading.Thread(target=request_inference, args=(image, image_id, inf_classes, times))
+        thread = threading.Thread(target=request_inference, args=(image, image_id, inf_classes, times, model))
         threads[i] = thread
         thread.start()
         wait = frame_delay - ((time.time() - start_time) % frame_delay)
@@ -80,4 +80,4 @@ def main(num_to_test, fps):
     print('inf latency:', np.sum(times) / num_to_test)
 
 if __name__ == '__main__':
-    main(int(sys.argv[1]), int(sys.argv[2]))
+    main(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3])
