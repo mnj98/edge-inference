@@ -10,7 +10,8 @@ import threading
 import random
 import time
 import sys
-
+import tensorflow_hub as hub
+import tensorflow as tf
 
 from flask import Flask, render_template, Response, request
 import cv2
@@ -51,12 +52,15 @@ from tensorflow.keras.applications import MobileNetV3Large, EfficientNetB0
 import tensorflow.keras.applications.mobilenet_v3 as mobilenet
 import tensorflow.keras.applications.efficientnet as efficientnet
 
+efficient_det_model = 'https://tfhub.dev/tensorflow/efficientdet/lite3/detection/1'
+
 
 keras_model_names = ['mobilenet', 'efficientnet']
 processing_functions = {'mobilenet': mobilenet.preprocess_input, 'efficientnet': efficientnet.preprocess_input}
 decode_functions = {'mobilenet': mobilenet.decode_predictions, 'efficientnet': efficientnet.decode_predictions}
-models = {'mobilenet': MobileNetV3Large(weights='imagenet'), 'efficientnet': EfficientNetB0(weights='imagenet')}
-requests = {'mobilenet': queue.Queue(), 'efficientnet': queue.Queue()}
+models = {'mobilenet': MobileNetV3Large(weights='imagenet'), 'efficientnet': EfficientNetB0(weights='imagenet'),\
+            'efficient_det': hub.load(efficient_det_model)}
+requests = {'mobilenet': queue.Queue(), 'efficientnet': queue.Queue(), 'efficient_det': queue.Queue()}
 events = queue.Queue()
 results = dict()
 
@@ -65,6 +69,36 @@ if len(sys.argv) == 2:
     BATCH_SIZE = int(sys.argv[1])
 else:
     BATCH_SIZE = 10
+
+def det_thread(model_name):
+    batch_n = 0
+    while True:
+        print(model_name,': batch number:', batch_n)
+        batch_n += 1
+        batch = []
+
+        idx = 0
+        while idx < BATCH_SIZE:
+            try:
+                r = requests[model_name].get(timeout=0.1)
+                batch.append(r)
+                idx += 1
+            except:
+                if len(batch) == 0:
+                    idx = 0
+                else:
+                    break
+        batch_images = tf.constant(np.array(list(map(lambda img: tf.constant(img['image']), batch))))
+        batch_events = list(map(lambda img: img['done_event'], batch))
+        batch_ids = list(map(lambda img: img['id'], batch))
+
+        boxes, scores, classes, num_detections = models['efficient_det'](batch_images)
+
+        for i in range(len(batch)):
+            results[batch_ids[i]] = (boxes[i], scores[i], classes[i], num_detections[i])
+        for e in batch_events:
+            e.set()
+
 
 def inference_thread(model_name):
     local = threading.local()
@@ -115,9 +149,10 @@ def main():
 
     keras_model_threads = [threading.Thread(target=inference_thread, args=(i,)) for i in keras_model_names]
     
+    detection_thread = threading.Thread(target=det_thread, args=('efficient_det',))
 
     server_thread = threading.Thread(target=flask_thread, args=())
-
+    detection_thread.start()
     for thread in keras_model_threads:
         thread.start()
     server_thread.start()
