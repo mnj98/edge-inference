@@ -26,7 +26,10 @@ def request_inference( image, index, result_buffer, inference_times, model = 'mo
         t = time.time()
         #print(id, t)
         req = requests.post(url, files = {'image': image}, data = {'model': model})
-        top_result = literal_eval(req.content.decode())[0]
+        if model != 'efficient_det':
+            top_result = literal_eval(req.content.decode())[0]
+        else:
+            top_result = req.content.decode()
         inf_time = time.time() - t
         #print(inf_time)
         #print('index:', index, 'true:', true_classes[index], 'res:', top_result, true_classes[index] == top_result, 'time:', inf_time)
@@ -36,8 +39,8 @@ def request_inference( image, index, result_buffer, inference_times, model = 'mo
         print('remote disconnected error on index:', index)
     except ConnectionError:
         print('connection error on index:', index)
-    except:
-        print('other error on index:', index)
+    #except:
+        #print('other error on index:', index)
 
 
 def capture_loop(q, num_to_test, shape):
@@ -80,7 +83,8 @@ def main(num_to_test, fps, model):
     for thread in threads:
         thread.join()
     capture_thread.join()
-    print('accuracy:',np.sum(inf_classes == true_classes) / num_to_test)
+    if model != 'efficient_det':
+    	print('accuracy:',np.sum(inf_classes == true_classes) / num_to_test)
     print('fps measured:', num_to_test / (time.time() - start_time), 'input:', fps)
     print('inf latency:', np.sum(times) / num_to_test)
 
