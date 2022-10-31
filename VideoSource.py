@@ -107,6 +107,6 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--numframes' , type=int, required=True)
     parser.add_argument('-f', '--fps', type=int, required=True)
     parser.add_argument('-m', '--model', choices=['mobilenet', 'efficientnet', 'efficient_det'], default='mobilenet')
-    parser.add_argument('-t', '--test', action='store_true')
+    parser.add_argument('-t', '--test', type=int, default=0, help='include an int that represents the batch size on the backend')
 
     main(parser.parse_args())
