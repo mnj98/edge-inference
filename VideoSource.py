@@ -33,7 +33,8 @@ def request_inference( image, index, result_buffer, inference_times, model = 'mo
         inf_time = time.time() - t
         #print(inf_time)
         #print('index:', index, 'true:', true_classes[index], 'res:', top_result, true_classes[index] == top_result, 'time:', inf_time)
-        result_buffer[index] = top_result
+        if model != 'efficient_det':
+            result_buffer[index] = top_result
         inference_times[index] = inf_time
     except RemoteDisconnected:
         print('remote disconnected error on index:', index)
