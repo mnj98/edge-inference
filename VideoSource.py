@@ -2,6 +2,7 @@ import cv2, time, requests, threading, sys, queue
 from ast import literal_eval
 from http.client import RemoteDisconnected
 import numpy as np
+import argparse
 
 class Source(object):
     def __init__(self, shape):
@@ -50,12 +51,13 @@ def capture_loop(q, num_to_test, shape):
     for i in range(num_to_test):
         q.put(images.get_frame())
 
-def main(num_to_test, fps, model):
-    if model == 'efficient_det':
+def main(args):#(num_to_test, fps, model):
+    num_to_test = args.numframes
+    if args.model == 'efficient_det':
         shape = (500,500)
     else:
         shape = (224,224)
-    frame_delay = 1/fps
+    frame_delay = 1/args.fps
     truths_file = open('/home/pi/ImageNet/2012/2012_ground_truth_ids.txt', 'r')
     true_classes = np.ndarray(shape=(num_to_test,), dtype='int32')
     inf_classes = np.ndarray(shape=(num_to_test,), dtype='int32')
@@ -75,7 +77,7 @@ def main(num_to_test, fps, model):
     for i in range(num_to_test):
         #print(image_queue.qsize())
         image_id, image = image_queue.get()
-        thread = threading.Thread(target=request_inference, args=(image, image_id, inf_classes, times, model))
+        thread = threading.Thread(target=request_inference, args=(image, image_id, inf_classes, times, args.model))
         threads[i] = thread
         thread.start()
         wait = frame_delay - ((time.time() - start_time) % frame_delay)
@@ -84,10 +86,27 @@ def main(num_to_test, fps, model):
     for thread in threads:
         thread.join()
     capture_thread.join()
-    if model != 'efficient_det':
-    	print('accuracy:',np.sum(inf_classes == true_classes) / num_to_test)
-    print('fps measured:', num_to_test / (time.time() - start_time), 'input:', fps)
-    print('inf latency:', np.sum(times) / num_to_test)
+
+    if not args.test:
+        if args.model != 'efficient_det':
+            print('accuracy:',np.sum(inf_classes == true_classes) / num_to_test)
+        print('fps measured:', num_to_test / (time.time() - start_time), 'input:', args.fps)
+        print('inf latency:', np.sum(times) / num_to_test)
+    else:
+        results_file = open(time.strftime('%Y-%m-%d-%H-%M-%S') ,'w')
+        results_file.write(str(args) + '\n')
+        results_file.write('Average latency: ' + str(np.sum(times) / num_to_test) + '\n')
+        results_file.write('Latencies: ' + str(times) + '\n')
+        if args.model != 'efficient_det':
+            results_file.write('accuracy: ' + str(np.sum(inf_classes == true_classes) / num_to_test) + '\n')
+        results_file.close()
+
 
 if __name__ == '__main__':
-    main(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3])
+    parser = argparse.ArgumentParser(description="Source images for remote inference")
+    parser.add_argument('-n', '--numframes' , type=int, required=True)
+    parser.add_argument('-f', '--fps', type=int, required=True)
+    parser.add_argument('-m', '--model', choices=['mobilenet', 'efficientnet', 'efficient_det'], default='mobilenet')
+    parser.add_argument('-t', '--test', action='store_true')
+
+    main(parser.parse_args())
