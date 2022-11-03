@@ -16,6 +16,10 @@ import tensorflow as tf
 from flask import Flask, render_template, Response, request
 import cv2
 
+import logging
+logging.getLogger('werkzeug').disabled = True
+
+
 def flask_thread():
     
     app = Flask(__name__)
@@ -23,6 +27,10 @@ def flask_thread():
     @app.route('/')
     def index():
         return render_template('index.html')
+    @app.route('/ping')
+    def ping():
+        return 'pong'
+
 
     @app.post('/infer')
     def inference():
@@ -96,8 +104,7 @@ def det_thread(model_name):
 
         for i in range(len(batch)):
             results[batch_ids[i]] = 'ok!'#(boxes[i], scores[i], classes[i], num_detections[i])
-        for e in batch_events:
-            e.set()
+            batch_events[i].set()
 
 
 def inference_thread(model_name):
@@ -139,9 +146,7 @@ def inference_thread(model_name):
 
         for i in range(len(local.batch)):
             results[local.batch_ids[i]] = list(map(lambda pr: int(pr[0][1:]),local.preds[i]))
-        for e in local.batch_events:
-            e.set()
-            #events.put(manager.Event())
+            local.batch_events[i].set()
 
 def main():
     for i in range(NUM_EVENTS):
