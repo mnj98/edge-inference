@@ -105,7 +105,7 @@ def main(args):#(num_to_test, fps, model):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Source images for remote inference")
     parser.add_argument('-n', '--numframes' , type=int, required=True)
-    parser.add_argument('-f', '--fps', type=int, required=True)
+    parser.add_argument('-f', '--fps', type=float, required=True)
     parser.add_argument('-m', '--model', choices=['mobilenet', 'efficientnet', 'efficient_det'], default='mobilenet')
     parser.add_argument('-t', '--test', type=int, default=0, help='include an int that represents the batch size on the backend')
 
