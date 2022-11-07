@@ -1,19 +1,19 @@
-#from asyncio import base_tasks
-#import  multiprocessing
-#from multiprocessing import Process
-#from random import random
-#from time import sleep
-#from server import run
+import argparse
+parser = argparse.ArgumentParser(description="Server for remote inference")
+parser.add_argument('-b', '--batchsize' , type=int, required=True)
+parser.add_argument('-d', '--debug', action='store_true')
+args = parser.parse_args()
+
 import numpy as np
 import queue
 import threading
 import random
 import time
-import sys
-import tensorflow_hub as hub
-import tensorflow as tf
-import argparse
-from flask import Flask, render_template, Response, request
+if not args.debug:
+    import tensorflow_hub as hub
+    import tensorflow as tf
+
+from flask import Flask, render_template, request
 import cv2
 
 import logging
@@ -46,29 +46,37 @@ def flask_thread():
         e.wait()
         e.clear()
         events.put(e)
-        #print(res)
         r = results.pop(image_id)
-        #print(r) 
         return r
     
     app.run(host='0.0.0.0', threaded=True,  port=1234)
 
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-from tensorflow.keras.applications import MobileNetV3Large, EfficientNetB0
-#from tensorflow.keras.preprocessing import image
+if not args.debug:
+    from tensorflow.keras.applications import  EfficientNetB0
+from tensorflow.keras.applications import MobileNetV3Large
 import tensorflow.keras.applications.mobilenet_v3 as mobilenet
-import tensorflow.keras.applications.efficientnet as efficientnet
+if not args.debug:
+    import tensorflow.keras.applications.efficientnet as efficientnet
 
-efficient_det_model = 'https://tfhub.dev/tensorflow/efficientdet/lite3/detection/1'
+if not args.debug:
+    efficient_det_model = 'https://tfhub.dev/tensorflow/efficientdet/lite3/detection/1'
 
-
-keras_model_names = ['mobilenet', 'efficientnet']
-processing_functions = {'mobilenet': mobilenet.preprocess_input, 'efficientnet': efficientnet.preprocess_input}
-decode_functions = {'mobilenet': mobilenet.decode_predictions, 'efficientnet': efficientnet.decode_predictions}
-models = {'mobilenet': MobileNetV3Large(weights='imagenet'), 'efficientnet': EfficientNetB0(weights='imagenet'),\
+if not args.debug:
+    keras_model_names = ['mobilenet', 'efficientnet']
+    processing_functions = {'mobilenet': mobilenet.preprocess_input, 'efficientnet': efficientnet.preprocess_input}
+    decode_functions = {'mobilenet': mobilenet.decode_predictions, 'efficientnet': efficientnet.decode_predictions}
+    models = {'mobilenet': MobileNetV3Large(weights='imagenet'), 'efficientnet': EfficientNetB0(weights='imagenet'),\
             'efficient_det': hub.load(efficient_det_model)}
-requests = {'mobilenet': queue.Queue(), 'efficientnet': queue.Queue(), 'efficient_det': queue.Queue()}
+    requests = {'mobilenet': queue.Queue(), 'efficientnet': queue.Queue(), 'efficient_det': queue.Queue()}
+else:
+    keras_model_names = ['mobilenet']
+    processing_functions = {'mobilenet': mobilenet.preprocess_input}
+    decode_functions = {'mobilenet': mobilenet.decode_predictions}
+    models = {'mobilenet': MobileNetV3Large(weights='imagenet')}
+    requests = {'mobilenet': queue.Queue()}
+
 events = queue.Queue()
 results = dict()
 
@@ -147,10 +155,17 @@ def inference_thread(model_name, BATCH_SIZE):
             local.batch_events[i].set()
         print('batch time:', time.time() - local.t)
 
-def main(args):
+def main():
     for i in range(NUM_EVENTS):
         events.put(threading.Event())
-    if not args.debug:
+    if args.debug:
+        print('----- debug mode -----')
+        mob_thread = threading.Thread(target=inference_thread, args=('mobilenet', args.batchsize,))
+        server_thread = threading.Thread(target=flask_thread, args=())
+        mob_thread.start()
+        server_thread.start()
+
+    else:
         keras_model_threads = [threading.Thread(target=inference_thread, args=(i,args.batchsize,)) for i in keras_model_names]
     
         detection_thread = threading.Thread(target=det_thread, args=('efficient_det',args.batchsize,))
@@ -160,15 +175,7 @@ def main(args):
         for thread in keras_model_threads:
             thread.start()
         server_thread.start()
-    else:
-         print('----- debug mode -----')
-         mob_thread = threading.Thread(target=inference_thread, args=('mobilenet', args.batchsize,))
-         server_thread = threading.Thread(target=flask_thread, args=())
-         mob_thread.start()
-         server_thread.start()
+         
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Server for remote inference")
-    parser.add_argument('-b', '--batchsize' , type=int, required=True)
-    parser.add_argument('-d', '--debug', action='store_true')
-    main(parser.parse_args())
+    main()
