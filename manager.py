@@ -12,7 +12,7 @@ import time
 import sys
 import tensorflow_hub as hub
 import tensorflow as tf
-
+import argparse
 from flask import Flask, render_template, Response, request
 import cv2
 
@@ -73,12 +73,8 @@ events = queue.Queue()
 results = dict()
 
 NUM_EVENTS = 3000
-if len(sys.argv) == 2:
-    BATCH_SIZE = int(sys.argv[1])
-else:
-    BATCH_SIZE = 10
 
-def det_thread(model_name):
+def det_thread(model_name, BATCH_SIZE):
     batch_n = 0
     while True:
         print(model_name,': batch number:', batch_n)
@@ -96,7 +92,7 @@ def det_thread(model_name):
                     idx = 0
                 else:
                     break
-        batch_images = tf.constant(np.array(list(map(lambda img: tf.constant(img['image']), batch))))
+        batch_images = tf.constant(np.array(list(map(lambda img: img['image'], batch))))
         batch_events = list(map(lambda img: img['done_event'], batch))
         batch_ids = list(map(lambda img: img['id'], batch))
 
@@ -105,20 +101,26 @@ def det_thread(model_name):
         for i in range(len(batch)):
             results[batch_ids[i]] = 'ok!'#(boxes[i], scores[i], classes[i], num_detections[i])
             batch_events[i].set()
-
-
-def inference_thread(model_name):
-    local = threading.local()
+local = threading.local()
+BATCH_TIME_ESTIMATE = 0.025
+def inference_thread(model_name, BATCH_SIZE):
+    #local = threading.local()
     local.batch_n = 0
+    local.prev_batch_size = 0
     while True:
-        print(model_name,': batch number:', local.batch_n)
+        local.t = time.time()
+        print(model_name,': batch number:', local.batch_n, 'size:', local.prev_batch_size)
         local.batch_n += 1
         local.batch = []
         #cut_off_time = time.time()
-        local.idx = 0
-        while local.idx < BATCH_SIZE:
+        local.batch.append(requests[model_name].get(True))
+        local.idx = 1
+        local.q_size = requests[model_name].qsize()
+        local.batch_collect_start_time = time.time()
+        for i in range(local.q_size): #while (time.time() - local.batch_collect_start_time) < BATCH_TIME_ESTIMATE or local.idx == 0: #while local.idx < BATCH_SIZE:
+            if local.idx > 0: print(time.time() - local.batch_collect_start_time)
             try:
-                local.r = requests[model_name].get(timeout=0.1)
+                local.r = requests[model_name].get(False) #(timeout=BATCH_TIME_ESTIMATE + 0.005)
                 local.batch.append(local.r)
                 local.idx += 1
             except:
@@ -126,88 +128,47 @@ def inference_thread(model_name):
                     local.idx = 0
                 else:
                     break
-                
-        '''for i in range(BATCH_SIZE):
-            try:
-                r = requests.get(timeout=1)
-                batch.append(r)
-            except:
-                if len(batch) == 0:
-        '''
 
+        if len(local.batch) == 0: continue
+        local.prev_batch_size = len(local.batch)
         local.batch_images = np.array(list(map(lambda img: img['image'], local.batch)))
         local.batch_events = list(map(lambda img: img['done_event'], local.batch))
         local.batch_ids = list(map(lambda img: img['id'], local.batch))
 
         local.frames = processing_functions[model_name](local.batch_images)
-        local.preds = decode_functions[model_name](models[model_name].predict(local.frames, verbose=1), top = 5)
+        local.pred_time = time.time()
+        local.preds = decode_functions[model_name](models[model_name].predict_on_batch(local.frames), top = 5)
+        print('pred_time', time.time() - local.pred_time)
         #print('preds',preds)
         #print(decode_predictions(preds, top=5))
 
         for i in range(len(local.batch)):
             results[local.batch_ids[i]] = list(map(lambda pr: int(pr[0][1:]),local.preds[i]))
             local.batch_events[i].set()
+        print('batch time:', time.time() - local.t)
 
-def main():
+def main(args):
     for i in range(NUM_EVENTS):
         events.put(threading.Event())
-
-    keras_model_threads = [threading.Thread(target=inference_thread, args=(i,)) for i in keras_model_names]
+    if not args.debug:
+        keras_model_threads = [threading.Thread(target=inference_thread, args=(i,args.batchsize,)) for i in keras_model_names]
     
-    detection_thread = threading.Thread(target=det_thread, args=('efficient_det',))
+        detection_thread = threading.Thread(target=det_thread, args=('efficient_det',args.batchsize,))
 
-    server_thread = threading.Thread(target=flask_thread, args=())
-    detection_thread.start()
-    for thread in keras_model_threads:
-        thread.start()
-    server_thread.start()
+        server_thread = threading.Thread(target=flask_thread, args=())
+        detection_thread.start()
+        for thread in keras_model_threads:
+            thread.start()
+        server_thread.start()
+    else:
+         print('----- debug mode -----')
+         mob_thread = threading.Thread(target=inference_thread, args=('mobilenet', args.batchsize,))
+         server_thread = threading.Thread(target=flask_thread, args=())
+         mob_thread.start()
+         server_thread.start()
 
 if __name__ == '__main__':
-    main()
-
-'''
-
-
-
-
-def qpush(req, res, events):
-    run(req, res, events)
-
-
-
-with multiprocessing.Manager() as manager:
-    requests = manager.Queue()
-    results = manager.dict()
-    events = manager.Queue()
-
-    for i in range(1000):
-        events.put(manager.Event())
-
-    server = multiprocessing.Process(target=qpush, args=(requests, results, events))
-
-    server.start()
-
-    batch_size = 10
-    while True:
-        batch = []
-        for i in range(batch_size):
-            r = requests.get()
-            batch.append(r)
-        
-        #image = r['image']
-        batch_images = np.array(list(map(lambda img: img['image'], batch)))
-        batch_events = list(map(lambda img: img['done_event'], batch))
-        batch_ids = list(map(lambda img: img['id'], batch))
-        #frame = np.expand_dims(image, axis=0)
-        frames = preprocess_input(batch_images)
-        preds = decode_predictions(model.predict(frames, verbose=1), top = 5)
-        #print('preds',preds)
-        #print(decode_predictions(preds, top=5))
-
-        for i in range(batch_size):
-            results[batch_ids[i]] = list(map(lambda pr: int(pr[0][1:]),preds[i]))
-        for e in batch_events:
-            e.set()
-            events.put(manager.Event())
-
-'''
+    parser = argparse.ArgumentParser(description="Server for remote inference")
+    parser.add_argument('-b', '--batchsize' , type=int, required=True)
+    parser.add_argument('-d', '--debug', action='store_true')
+    main(parser.parse_args())
