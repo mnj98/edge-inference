@@ -34,9 +34,11 @@ def flask_thread():
 
     @app.post('/infer')
     def inference():
+        #t = time.time()
         image_id = random.random() #request.values['id']
         model_to_use = request.values['model']
         image = request.files['image'].read()
+        t = time.time()
         image = np.frombuffer(image, np.uint8)
         image = cv2.imdecode(image, cv2.IMREAD_COLOR)
 
@@ -47,7 +49,8 @@ def flask_thread():
         e.clear()
         events.put(e)
         r = results.pop(image_id)
-        return r
+        print(r)
+        return r + [time.time() - t]
     
     app.run(host='0.0.0.0', threaded=True,  port=1234)
 
