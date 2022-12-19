@@ -3,7 +3,7 @@ import cv2
 on_pi = False
 
 images_path = "/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG" if on_pi else \
-    "/Users/mnj98/Desktop/ILSVRC2012_img_val/ILSVRC2012_val_%08d.JPEG"
+    "/Users/mnj98/ImageNet/ILSVRC2012_img_val/ILSVRC2012_val_%08d.JPEG"
 
 class VideoSource(object):
     def __init__(self, shape):
