@@ -21,3 +21,17 @@ class VideoSource(object):
 
         ret, jpeg = cv2.imencode('.jpg', cv2.resize(image, self.shape))
         return (frame_index, jpeg.tobytes())
+
+
+class inf_response(object):
+    def __init__(self, id, classes, local, latency = None):
+        self.id = id
+        self.classes = classes
+        self.local = local
+        self.latency = latency
+
+class inf_request(object):
+    def __init__(self, id, image, model = 'mobilenet'):
+        self.id = id
+        self.image = image
+        self.model = model
