@@ -21,12 +21,11 @@ def infer_loop(in_q, out_q, ready_event, model_name = 'mobilenet'):
         
         image = in_q.get()
         ready_event.clear()
-        frame = cv2.imdecode(image.frame, cv2.IMREAD_COLOR)
+        frame = cv2.imdecode(np.frombuffer(image.image[1], np.uint8), cv2.IMREAD_COLOR)
         frame = preprocess(np.expand_dims(frame, axis=0))
 
         classification = model.predict_on_batch(frame)
-
-        preds = list(map(lambda pr: int(pr[0][1:]), decode(classification, top = 5)))
+        preds = list(map(lambda pr: int(pr[0][1:]), decode(classification, top = 5)[0]))
 
         out_q.put(VideoSource.inf_response(image.id, preds, True))
         ready_event.set()
