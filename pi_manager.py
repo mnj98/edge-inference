@@ -13,7 +13,7 @@ def capture_loop(q, num_to_test, shape):
 
 def main():
     num_to_test = 50
-    shape = (223,224)
+    shape = (224,224)
     image_queue = multiprocessing.Queue(1)
     req_queue = multiprocessing.Queue()
     res_queue = multiprocessing.Queue()
