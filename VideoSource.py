@@ -20,7 +20,7 @@ class VideoSource(object):
         success, image = self.video.read()
 
         ret, jpeg = cv2.imencode('.jpg', cv2.resize(image, self.shape))
-        return (frame_index, jpeg.tobytes())
+        return inf_request(frame_index, jpeg.tobytes())
 
 
 class inf_response(object):
