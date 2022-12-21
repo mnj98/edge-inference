@@ -24,11 +24,11 @@ class VideoSource(object):
 
 
 class inf_response(object):
-    def __init__(self, id, classes, local, latency = None):
+    def __init__(self, id, classes, local, timestamp = None):
         self.id = id
         self.classes = classes
         self.local = local
-        self.latency = latency
+        self.timestamp = timestamp
 
 class inf_request(object):
     def __init__(self, id, image, model = 'mobilenet'):
