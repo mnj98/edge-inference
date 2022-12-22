@@ -1,6 +1,6 @@
 import cv2
 
-on_pi = True
+on_pi = False
 
 images_path = "/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG" if on_pi else \
     "/Users/mnj98/ImageNet/ILSVRC2012_img_val/ILSVRC2012_val_%08d.JPEG"
@@ -24,11 +24,12 @@ class VideoSource(object):
 
 
 class inf_response(object):
-    def __init__(self, id, classes, local, timestamp = None):
+    def __init__(self, id, classes, local, timestamp = None, success = True):
         self.id = id
         self.classes = classes
         self.local = local
         self.timestamp = timestamp
+        self.success = success
 
 class inf_request(object):
     def __init__(self, id, image, model = 'mobilenet'):
