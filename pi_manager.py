@@ -7,15 +7,18 @@ import numpy as np
 from ast import literal_eval
 
 def request_offload(request, q, timeout, url='http://localhost:1234/infer'):
+    t = time.time()
     try:
         req = requests.post(url, files = {\
-            'image': request.image}, data = {'model': request.model}, timeout=1)
+            'image': request.image}, data = {'model': request.model}, timeout=timeout)
+        lat = time.time() - t
         data = literal_eval(req.content.decode())
 
-        q.put(Res(request.id, data[:-1],False, time.time()))
+        q.put(Res(request.id, data[:-1],False, lat))
     except Exception as E: #requests.exceptions.Timeout as T:
+        lat = time.time() - t
         print('failed', E)
-        q.put(Res(request.id, None, False, time.time(), False))
+        q.put(Res(request.id, None, False, lat, False))
 
 
 def capture_loop(q, num_to_test, shape, frame_delay, model = 'mobilenet'):
@@ -29,6 +32,7 @@ def process_results(q, arr, num_to_test):
     for i in range(num_to_test):
         result = q.get()
         arr[result.id] = result
+        print('lat for', result.id, 'is', result.latency)
 
 def measure(config, lock, done):
     d = 1 / config['measure_rate']
@@ -40,8 +44,8 @@ def measure(config, lock, done):
                 prev = config['processed_in_time'][-2]
                 curr = config['processed_in_time'][-1]
                 print("FPS:", (curr[1] - prev[1]) / (curr[0] - prev[0]))
-            if len(config['processed_in_time']) > 15:
-                config['enabled'] = False
+            #if len(config['processed_in_time']) > 15:
+            #   config['enabled'] = False
         wait = d - ((time.time() - st) % d)
         time.sleep(wait)
 def get_processed(config, lock):
@@ -49,9 +53,9 @@ def get_processed(config, lock):
         return config['processed']
 
 def main():
-    num_to_test = 500
+    num_to_test = 60
     config_lock = threading.Lock()
-    offload_config = {'frame_delay': 1/10,\
+    offload_config = {'frame_delay': 1/31,\
          'enabled': True,\
          'processed': 0,\
          'processed_in_time': [],\

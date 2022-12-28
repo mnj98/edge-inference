@@ -24,11 +24,11 @@ class VideoSource(object):
 
 
 class inf_response(object):
-    def __init__(self, id, classes, local, timestamp = None, success = True):
+    def __init__(self, id, classes, local, latency = None, success = True):
         self.id = id
         self.classes = classes
         self.local = local
-        self.timestamp = timestamp
+        self.latency = latency
         self.success = success
 
 class inf_request(object):
