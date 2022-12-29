@@ -47,6 +47,7 @@ def measure(config, done):
 
 def main():
     num_to_test = int(sys.argv[1])
+    timeout = float(sys.argv[2])
     #config_lock = threading.Lock()
     #offload_config = {'frame_delay': 1/31,\
     #     'enabled': True,\
@@ -54,7 +55,8 @@ def main():
     #     'processed_in_time': [],\
     #     'measure_rate': 3}
     #fps = 30
-    config = Config(source_fps=30, offload_fps=40, mps=3)
+    config = Config(source_fps=60, offload_fps=60, mps=3)
+    #config.disable_offloading()
     frame_delay = 1 / config.sfps
     shape = config.shape
     results_arr = np.ndarray((num_to_test,), dtype=Res)
@@ -104,12 +106,12 @@ def main():
             last_offload = time.time()
             config.add_proc()
             o_count += 1
-            thread = threading.Thread(target=request_offload, args=(req, res_queue, config, 0.15))
+            thread = threading.Thread(target=request_offload, args=(req, res_queue, config, timeout))
             thread.start()
             offload_threads.append(thread)
 
         elif infer_ready.is_set() and \
-            (config.get_offload_fps() > frame_delay\
+            ((1/config.get_offload_fps()) > frame_delay\
             or not config.is_offloading_enabled()):
             config.add_proc()
             pull_from_queue_event.set()
