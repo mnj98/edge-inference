@@ -1,14 +1,36 @@
 import cv2, copy, time
 from threading import Lock
+from simple_pid import PID
 
-on_pi = True
+on_pi = False
 
 images_path = "/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG" if on_pi else \
     "/Users/mnj98/ImageNet/ILSVRC2012_img_val/ILSVRC2012_val_%08d.JPEG"
 
+class Offload_Controller(object):
+    def __init__(self, config):
+        self.config = config
+        self.controller = PID(self.config.pid_config[0],\
+            self.config.pid_config[1],\
+            self.config.pid_config[2],\
+            setpoint=self.config.pid_config[3])
+        self.controller.output_limits = (0, self.config.sfps)
+        self.controller.sample_time = None
+    
+    def control_and_update(self, tps):
+        if tps == None: return
+        ofps = self.config.get_offload_fps()
+        ratio = ofps / (ofps - tps + 1)
+        new_ofps = round(self.controller(ratio))
+        if new_ofps == 0: new_ofps = 1
+        print('new ofps:', new_ofps)
+        self.config.set_offload_fps(new_ofps)
+
+    
+
 
 class Config(object):
-    def __init__(self, source_fps, offload_fps, mps=1, enabled=True, shape=(224,224)):
+    def __init__(self, source_fps, offload_fps, mps=1, enabled=True, shape=(224,224), pid_config = None):
         self.locks = {'fps': Lock(),\
             'mps': Lock(),\
             'enabled': Lock(),\
@@ -21,6 +43,7 @@ class Config(object):
         self.mps = mps
         self.enabled = enabled
         self.shape = shape
+        self.pid_config = pid_config if pid_config else (5,3,0.0000001, 1)
 
         self.proc_count = 0
         self.timeout_count = 0

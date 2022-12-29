@@ -1,7 +1,7 @@
 import tensorflow.keras.applications as models
 import cv2, time
 import numpy as np
-import VideoSource
+from Helpers import inf_response as Res
 
 def infer_loop(in_q, out_q, ready_event, pull_event, model_name = 'mobilenet'):
     if model_name == 'mobilenet':
@@ -28,6 +28,6 @@ def infer_loop(in_q, out_q, ready_event, pull_event, model_name = 'mobilenet'):
         classification = model.predict_on_batch(frame)
         preds = list(map(lambda pr: int(pr[0][1:]), decode(classification, top = 5)[0]))
         lat = time.time() - t
-        out_q.put(VideoSource.inf_response(req.id, preds, True, lat))
+        out_q.put(Res(req.id, preds, True, lat))
         pull_event.clear()
         ready_event.set()

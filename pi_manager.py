@@ -1,7 +1,7 @@
-from VideoSource import VideoSource as Source
-from VideoSource import inf_request as Req
-from VideoSource import inf_response as Res
-from VideoSource import Config
+from Helpers import VideoSource as Source
+from Helpers import inf_request as Req
+from Helpers import inf_response as Res
+from Helpers import Config, Offload_Controller
 import multiprocessing, time, threading, requests, sys
 from pi_local_infer import infer_loop
 import numpy as np
@@ -36,12 +36,14 @@ def process_results(q, arr, num_to_test):
         arr[result.id] = result
         #print('lat for', result.id, 'is', result.latency)
 
-def measure(config, done):
+def measure_and_control(config, done, controller):
     d = 1 / config.get_measure_rate()
     st = time.time()
     while not done.is_set():
         print("FPS", config.measure_and_report_fps())
-        print("TPS", config.measure_and_report_tps())
+        tps = config.measure_and_report_tps()
+        print("TPS", tps)
+        controller.control_and_update(tps)
         wait = d - ((time.time() - st) % d)
         time.sleep(wait)
 
@@ -55,8 +57,9 @@ def main():
     #     'processed_in_time': [],\
     #     'measure_rate': 3}
     #fps = 30
-    config = Config(source_fps=60, offload_fps=60, mps=3)
-    #config.disable_offloading()
+    config = Config(source_fps=60, offload_fps=1, mps=3)
+    controller = Offload_Controller(config)
+    config.disable_offloading()
     frame_delay = 1 / config.sfps
     shape = config.shape
     results_arr = np.ndarray((num_to_test,), dtype=Res)
@@ -74,8 +77,8 @@ def main():
     
 
     measure_done_event = threading.Event()
-    measure_thread = threading.Thread(target=measure, args=(config,\
-        measure_done_event))
+    measure_thread = threading.Thread(target=measure_and_control, args=(config,\
+        measure_done_event, controller))
     pull_from_queue_event.set()
     #warm up
     infer_ready.wait()
