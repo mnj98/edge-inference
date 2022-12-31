@@ -1,4 +1,4 @@
-import cv2, copy, time
+import cv2, copy, time, configparser
 from threading import Lock
 from simple_pid import PID
 
@@ -7,30 +7,31 @@ on_pi = False
 images_path = "/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG" if on_pi else \
     "/Users/mnj98/ImageNet/ILSVRC2012_img_val/ILSVRC2012_val_%08d.JPEG"
 
-class Offload_Controller(object):
-    def __init__(self, config):
-        self.config = config
-        self.controller = PID(self.config.pid_config[0],\
-            self.config.pid_config[1],\
-            self.config.pid_config[2],\
-            setpoint=self.config.pid_config[3])
-        self.controller.output_limits = (0, self.config.sfps)
-        self.controller.sample_time = None
-    
-    def control_and_update(self, tps):
-        if tps == None: return
-        ofps = self.config.get_offload_fps()
-        ratio = ofps / (ofps - tps + 1)
-        new_ofps = round(self.controller(ratio))
-        if new_ofps == 0: new_ofps = 1
-        print('new ofps:', new_ofps)
-        self.config.set_offload_fps(new_ofps)
-
-    
-
 
 class Config(object):
-    def __init__(self, source_fps, offload_fps, mps=1, enabled=True, shape=(224,224), pid_config = None):
+    def __init__(self, file):
+        parser = configparser.ConfigParser()
+        parser.read(file)
+        
+        self.samples = parser.getint('Video Source', 'samples')
+        self.model = parser.get('Video Source', 'model')
+        self.timeout = parser.getfloat('Video Source', 'latency_timeout')
+        self.ofps = parser.getint('Controller', 'initial_offloading_rate')
+        self.sfps = parser.getint('Video Source', 'fps')
+        self.mps = parser.getfloat('Controller', 'measure_rate')
+        self.enabled = parser.getboolean('Controller', 'enable_offloading')
+        size = parser.getint('Video Source', 'size')
+        self.shape = (size, size)
+        [self.p, self.i, self.d] = [parser.getfloat('Controller', j) for j in ['p', 'i', 'd']]
+        self.set_point = parser.getfloat('Controller', 'set_point')
+        self.PID_enabled = parser.getboolean('Controller', 'enable_pid')
+
+        self.proc_count = 0
+        self.timeout_count = 0
+
+        self.pps = []
+        self.tps = []
+
         self.locks = {'fps': Lock(),\
             'mps': Lock(),\
             'enabled': Lock(),\
@@ -38,18 +39,16 @@ class Config(object):
             'timeout': Lock(),\
             'pps': Lock(),\
             'tps': Lock()}
-        self.ofps = offload_fps
-        self.sfps = source_fps
-        self.mps = mps
-        self.enabled = enabled
-        self.shape = shape
-        self.pid_config = pid_config if pid_config else (5,3,0.0000001, 1)
-
-        self.proc_count = 0
-        self.timeout_count = 0
-
-        self.pps = []
-        self.tps = []
+    def is_PID_enabled(self): return self.PID_enabled
+    def get_p(self): return self.p
+    def get_i(self): return self.i
+    def get_d(self): return self.d
+    def get_set_point(self): return self.set_point
+    def get_shape(self): return self.shape
+    def get_samples(self): return self.samples
+    def get_model(self): return self.model
+    def get_latency_timeout(self): return self.timeout
+    def get_source_fps(self): return self.sfps
     def measure_and_report_fps(self):
         with self.locks['pps']:
             with self.locks['proc']:
@@ -116,6 +115,25 @@ class Config(object):
     def get_timeouts(self):
         with self.locks['timeout']:
             return self.timeout_count
+
+class Offload_Controller(object):
+    def __init__(self, config: Config):
+        self.config = config
+        self.controller = PID(self.config.get_p(),\
+            self.config.get_i(),\
+            self.config.get_d(),\
+            setpoint=self.config.get_set_point())
+        self.controller.output_limits = (0, self.config.get_source_fps())
+        self.controller.sample_time = None
+    
+    def control_and_update(self, tps):
+        if tps == None or not self.config.is_PID_enabled(): return
+        ofps = self.config.get_offload_fps()
+        ratio = ofps / (ofps - tps + 1)
+        new_ofps = round(self.controller(ratio))
+        if new_ofps == 0: new_ofps = 1
+        print('new ofps:', new_ofps)
+        self.config.set_offload_fps(new_ofps)
 
 class VideoSource(object):
     def __init__(self, shape):

@@ -7,11 +7,11 @@ from pi_local_infer import infer_loop
 import numpy as np
 from ast import literal_eval
 
-def request_offload(request, q, config, timeout, url='http://localhost:1234/infer'):
+def request_offload(request, q, config, url='http://localhost:1234/infer'):
     t = time.time()
     try:
         req = requests.post(url, files = {\
-            'image': request.image}, data = {'model': request.model}, timeout=timeout)
+            'image': request.image}, data = {'model': request.model}, timeout=config.get_latency_timeout())
         lat = time.time() - t
         data = literal_eval(req.content.decode())
 
@@ -23,7 +23,7 @@ def request_offload(request, q, config, timeout, url='http://localhost:1234/infe
         q.put(Res(request.id, None, False, lat, False))
 
 
-def capture_loop(q, num_to_test, shape, frame_delay, model = 'mobilenet'):
+def capture_loop(q, num_to_test, shape, model = 'mobilenet'):
     images = Source(shape)
     for i in range(num_to_test):
         req = images.get_frame()
@@ -47,98 +47,125 @@ def measure_and_control(config, done, controller):
         wait = d - ((time.time() - st) % d)
         time.sleep(wait)
 
-def main():
-    num_to_test = int(sys.argv[1])
-    timeout = float(sys.argv[2])
-    #config_lock = threading.Lock()
-    #offload_config = {'frame_delay': 1/31,\
-    #     'enabled': True,\
-    #     'processed': 0,\
-    #     'processed_in_time': [],\
-    #     'measure_rate': 3}
-    #fps = 30
-    config = Config(source_fps=60, offload_fps=1, mps=3)
+def main(config_file):
+    #create and parse config file
+    config = Config(config_file)
+    
+    #create PID controller based on config specs
     controller = Offload_Controller(config)
-    config.disable_offloading()
-    frame_delay = 1 / config.sfps
-    shape = config.shape
+
+    num_to_test = config.get_samples()
+    frame_delay = 1 / config.get_source_fps()
+    shape = config.get_shape()
+
     results_arr = np.ndarray((num_to_test,), dtype=Res)
     image_queue = multiprocessing.Queue(1)
-    req_queue = multiprocessing.Queue(1)
     res_queue = multiprocessing.Queue()
+
+    #image capture process
     cap_proc = multiprocessing.Process(target=capture_loop, \
-        args=(image_queue, num_to_test, shape, 1/config.sfps))
+        args=(image_queue, num_to_test, shape))
+
+    #event that tells the local processing process to grab an image
     pull_from_queue_event = multiprocessing.Event()
+    #event that tells this process that the local processing process
+        #is ready for another frame
     infer_ready = multiprocessing.Event()
+    #local inference process
     local_infer_proc = multiprocessing.Process( \
-        target=infer_loop, args=(image_queue, res_queue, infer_ready, pull_from_queue_event))
+        target=infer_loop, args=(image_queue, res_queue,\
+        infer_ready, pull_from_queue_event))
     local_infer_proc.start()
+
+    #a thread that collects results
     res_thread = threading.Thread(target=process_results, args=(res_queue, results_arr, num_to_test))
     
-
+    #an event that tells the measure thread to stop
     measure_done_event = threading.Event()
+    #the measurement and controlling thread
+        #runs in this process
     measure_thread = threading.Thread(target=measure_and_control, args=(config,\
         measure_done_event, controller))
+
+    #warm up local processing
     pull_from_queue_event.set()
-    #warm up
     infer_ready.wait()
     image_queue.put(Source(shape).get_frame())
     res_queue.get()
+    infer_ready.wait()
 
     
-    time.sleep(1)
+    #time.sleep(1)
     cap_proc.start()
     res_thread.start()
     print('starting')
 
     last_offload = time.time()
 
-
     o_count = 0
-    #processed = 0
     offload_threads = []
     measure_thread.start()
     start_time = time.time()
     print('start time', start_time)
 
+    #process images 
     while config.get_procs() < num_to_test:
         t_since_last_offload = time.time() - last_offload
+        #if next images should be offloaded
         if config.is_offloading_enabled()\
-            and t_since_last_offload - (1/config.get_offload_fps()) > -0.003: #offload
+            and t_since_last_offload - (1/config.get_offload_fps()) > -0.003:
+
             req = image_queue.get()
             last_offload = time.time()
             config.add_proc()
             o_count += 1
-            thread = threading.Thread(target=request_offload, args=(req, res_queue, config, timeout))
+            thread = threading.Thread(target=request_offload, args=(req, res_queue, config))
             thread.start()
             offload_threads.append(thread)
 
+        #If the next frame can be processed locally
         elif infer_ready.is_set() and \
             ((1/config.get_offload_fps()) > frame_delay\
             or not config.is_offloading_enabled()):
+
             config.add_proc()
+            #tell local processing process to process an image
             pull_from_queue_event.set()
+        
+        #wait until the next frame & continue the loop
         wait = frame_delay - ((time.time() - start_time) % frame_delay)
         time.sleep(wait)
-        #with config_lock:
-        #    print(offload_config['processed_in_time'])
         continue
 
+    #wait until all results are in
     res_thread.join()
     
+    #all offload threads should be done by this time
     for t in offload_threads:
         t.join()
     total_time = time.time() - start_time
+
+    #stop measuring
     measure_done_event.set()
     measure_thread.join()
+    #this FPS is not entirely accurate, the measured fps is more accurate
     print("Total time:", total_time, "FPS =", num_to_test / total_time)
     print("Offload %:", o_count / num_to_test)
+
+
+    #kill local processing 
     local_infer_proc.kill()
     local_infer_proc.join()
     local_infer_proc.close()
+    
     cap_proc.join()
 
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        config_file = sys.argv[1]
+    except:
+        config_file = 'default_config.ini'
+    print(config_file)
+    main(config_file)
