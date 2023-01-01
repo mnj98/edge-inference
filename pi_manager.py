@@ -41,8 +41,8 @@ def change_network(changes, done):
         #use -1 to disable
         rate = (change['rate'] if not change['rate'] == '-1' else '10000') + ' '
         loss = (change['loss'] if not change['loss'] == '-1' else '0') + ' '
-        delay = (change['latency'] if not change['latency'] == '-1' else '0') + ' '
-        jitter = (change['jitter'] if not change['jitter'] == '-1' else '0') + ' '
+        delay = (change['latency'] if not change['latency'] == '-1' else '0.1') + ' '
+        jitter = (change['jitter'] if not change['jitter'] == '-1' else '0.1') + ' '
         os.system('sh update_net.sh ' + rate + loss + delay + jitter)
         time.sleep(float(change['wait_time']))
 
@@ -165,6 +165,7 @@ def main(config_file):
     done_event.set()
     measure_thread.join()
     net_thread.join()
+    os.system('sh reset_net.sh')
     #this FPS is not entirely accurate, the measured fps is more accurate
     print("Total time:", total_time, "FPS =", num_to_test / total_time)
     print("Offload %:", o_count / num_to_test)
