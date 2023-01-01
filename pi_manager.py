@@ -1,8 +1,7 @@
 from Helpers import VideoSource as Source
-from Helpers import inf_request as Req
 from Helpers import inf_response as Res
 from Helpers import Config, Offload_Controller
-import multiprocessing, time, threading, requests, sys
+import multiprocessing, time, threading, requests, sys, os
 from pi_local_infer import infer_loop
 import numpy as np
 from ast import literal_eval
@@ -36,6 +35,18 @@ def process_results(q, arr, num_to_test):
         arr[result.id] = result
         #print('lat for', result.id, 'is', result.latency)
 
+def change_network(changes, done):
+    for change in changes:
+        if done.is_set(): break
+        #use -1 to disable
+        rate = (change['rate'] if not change['rate'] == '-1' else '10000') + ' '
+        loss = (change['loss'] if not change['loss'] == '-1' else '0') + ' '
+        delay = (change['latency'] if not change['latency'] == '-1' else '0') + ' '
+        jitter = (change['jitter'] if not change['jitter'] == '-1' else '0') + ' '
+        os.system('sh update_net.sh ' + rate + loss + delay + jitter)
+        time.sleep(float(change['wait_time']))
+
+
 def measure_and_control(config, done, controller):
     d = 1 / config.get_measure_rate()
     st = time.time()
@@ -62,6 +73,11 @@ def main(config_file):
     image_queue = multiprocessing.Queue(1)
     res_queue = multiprocessing.Queue()
 
+    #an event that tells the measure and net threads to stop
+    done_event = threading.Event()
+
+    net_thread = threading.Thread(target=change_network,\
+        args=(config.get_network_conditions(), done_event))
     #image capture process
     cap_proc = multiprocessing.Process(target=capture_loop, \
         args=(image_queue, num_to_test, shape))
@@ -80,12 +96,11 @@ def main(config_file):
     #a thread that collects results
     res_thread = threading.Thread(target=process_results, args=(res_queue, results_arr, num_to_test))
     
-    #an event that tells the measure thread to stop
-    measure_done_event = threading.Event()
+    
     #the measurement and controlling thread
         #runs in this process
     measure_thread = threading.Thread(target=measure_and_control, args=(config,\
-        measure_done_event, controller))
+        done_event, controller))
 
     #warm up local processing
     pull_from_queue_event.set()
@@ -105,6 +120,7 @@ def main(config_file):
     o_count = 0
     offload_threads = []
     measure_thread.start()
+    net_thread.start()
     start_time = time.time()
     print('start time', start_time)
 
@@ -146,8 +162,9 @@ def main(config_file):
     total_time = time.time() - start_time
 
     #stop measuring
-    measure_done_event.set()
+    done_event.set()
     measure_thread.join()
+    net_thread.join()
     #this FPS is not entirely accurate, the measured fps is more accurate
     print("Total time:", total_time, "FPS =", num_to_test / total_time)
     print("Offload %:", o_count / num_to_test)

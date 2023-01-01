@@ -1,4 +1,4 @@
-import cv2, copy, time, configparser
+import cv2, copy, time, configparser, csv
 from threading import Lock
 from simple_pid import PID
 
@@ -32,6 +32,12 @@ class Config(object):
         self.pps = []
         self.tps = []
 
+        n = open(parser.get('Network', 'file'), 'r', newline='')
+        net_stats = list(csv.DictReader(n))
+        n.close()
+        self.net_stats = net_stats
+
+
         self.locks = {'fps': Lock(),\
             'mps': Lock(),\
             'enabled': Lock(),\
@@ -39,6 +45,7 @@ class Config(object):
             'timeout': Lock(),\
             'pps': Lock(),\
             'tps': Lock()}
+    def get_network_conditions(self):return self.net_stats
     def is_PID_enabled(self): return self.PID_enabled
     def get_p(self): return self.p
     def get_i(self): return self.i
