@@ -1,7 +1,7 @@
 from Helpers import VideoSource as Source
 from Helpers import inf_response as Res
 from Helpers import Config, Offload_Controller
-import multiprocessing, time, threading, requests, sys, os
+import multiprocessing, time, threading, requests, sys, os, psutil, csv
 from pi_local_infer import infer_loop
 import numpy as np
 from ast import literal_eval
@@ -33,35 +33,51 @@ def process_results(q, arr, num_to_test):
     for i in range(num_to_test):
         result = q.get()
         arr[result.id] = result
-        #print('lat for', result.id, 'is', result.latency)
 
-def change_network(changes, done):
-    for change in changes:
+def change_network(config, done):
+    for change in config.get_network_conditions():
         if done.is_set(): break
         #use -1 to disable
         rate = (change['rate'] if not change['rate'] == '-1' else '10000') + ' '
         loss = (change['loss'] if not change['loss'] == '-1' else '0') + ' '
         delay = (change['latency'] if not change['latency'] == '-1' else '0.1') + ' '
         jitter = (change['jitter'] if not change['jitter'] == '-1' else '0.1') + ' '
+        config.set_current_net({'rate':rate ,\
+            'loss': loss, 'latency': delay, 'jitter': jitter})
         os.system('sh update_net.sh ' + rate + loss + delay + jitter)
         time.sleep(float(change['wait_time']))
 
 
-def measure_and_control(config, done, controller):
+def measure_and_control(config, done, controller, stats_arr):
     d = 1 / config.get_measure_rate()
     st = time.time()
+    cpu = None
     while not done.is_set():
-        print("FPS", config.measure_and_report_fps())
+        fps = config.measure_and_report_fps()
+        print("FPS", fps)
         tps = config.measure_and_report_tps()
         print("TPS", tps)
         controller.control_and_update(tps)
+
+        stats = {'time': time.time() - st,\
+            'fps': fps, 'tps': tps, 'cpu': cpu, 'ops': config.get_offload_fps(),\
+            'offload_fps': config.get_o_count()}
+        net = config.get_current_net()
+        if not net == None:
+            stats.update(config.get_current_net())
+            if None in stats.values():
+                print('Stats not ready:', stats)
+            else:
+                stats_arr.append(stats)
+
         wait = d - ((time.time() - st) % d)
-        time.sleep(wait)
+        #waits for wait and count CPU usage
+        cpu = psutil.cpu_percent(wait)
 
 def main(config_file):
     #create and parse config file
     config = Config(config_file)
-    
+
     #create PID controller based on config specs
     controller = Offload_Controller(config)
 
@@ -77,7 +93,7 @@ def main(config_file):
     done_event = threading.Event()
 
     net_thread = threading.Thread(target=change_network,\
-        args=(config.get_network_conditions(), done_event))
+        args=(config, done_event))
     #image capture process
     cap_proc = multiprocessing.Process(target=capture_loop, \
         args=(image_queue, num_to_test, shape))
@@ -94,13 +110,15 @@ def main(config_file):
     local_infer_proc.start()
 
     #a thread that collects results
-    res_thread = threading.Thread(target=process_results, args=(res_queue, results_arr, num_to_test))
-    
-    
+    res_thread = threading.Thread(target=process_results,\
+        args=(res_queue, results_arr, num_to_test))
+
+
     #the measurement and controlling thread
         #runs in this process
+    results_arr = []
     measure_thread = threading.Thread(target=measure_and_control, args=(config,\
-        done_event, controller))
+        done_event, controller, results_arr))
 
     #warm up local processing
     pull_from_queue_event.set()
@@ -109,24 +127,21 @@ def main(config_file):
     res_queue.get()
     infer_ready.wait()
 
-    
-    #time.sleep(1)
     cap_proc.start()
     res_thread.start()
-    print('starting')
+    print('STARTING')
 
     last_offload = time.time()
 
-    o_count = 0
     offload_threads = []
     measure_thread.start()
     net_thread.start()
     start_time = time.time()
-    print('start time', start_time)
 
-    #process images 
+    #process images
     while config.get_procs() < num_to_test:
         t_since_last_offload = time.time() - last_offload
+        need_to_wait = False
         #if next images should be offloaded
         if config.is_offloading_enabled()\
             and t_since_last_offload - (1/config.get_offload_fps()) > -0.003:
@@ -134,10 +149,11 @@ def main(config_file):
             req = image_queue.get()
             last_offload = time.time()
             config.add_proc()
-            o_count += 1
+            config.add_o_count()
             thread = threading.Thread(target=request_offload, args=(req, res_queue, config))
             thread.start()
             offload_threads.append(thread)
+            need_to_wait = True
 
         #If the next frame can be processed locally
         elif infer_ready.is_set() and \
@@ -147,12 +163,13 @@ def main(config_file):
             config.add_proc()
             #tell local processing process to process an image
             pull_from_queue_event.set()
+            need_to_wait = True
         
         #wait until the next frame & continue the loop
-        wait = frame_delay - ((time.time() - start_time) % frame_delay)
-        time.sleep(wait)
-        continue
-
+        if need_to_wait:
+            wait = frame_delay - ((time.time() - start_time) % frame_delay)
+            time.sleep(wait)
+    print("DONE")
     #wait until all results are in
     res_thread.join()
     
@@ -168,8 +185,16 @@ def main(config_file):
     os.system('sh reset_net.sh')
     #this FPS is not entirely accurate, the measured fps is more accurate
     print("Total time:", total_time, "FPS =", num_to_test / total_time)
-    print("Offload %:", o_count / num_to_test)
+    print("Offload %:", config.get_o_count() / num_to_test)
+    #print(results_arr)
 
+    with open('metrics/' + str(time.time()) + '.csv', 'w', newline='') as csvfile:
+        fieldnames = results_arr[0].keys()
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        writer.writeheader()
+        for r in results_arr:
+            writer.writerow(r)
 
     #kill local processing 
     local_infer_proc.kill()

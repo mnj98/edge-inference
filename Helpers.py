@@ -36,7 +36,8 @@ class Config(object):
         net_stats = list(csv.DictReader(n))
         n.close()
         self.net_stats = net_stats
-
+        self.current_net_stat = None
+        self.o_count = 0
 
         self.locks = {'fps': Lock(),\
             'mps': Lock(),\
@@ -44,7 +45,21 @@ class Config(object):
             'proc': Lock(),\
             'timeout': Lock(),\
             'pps': Lock(),\
-            'tps': Lock()}
+            'tps': Lock(),\
+            'net': Lock(),\
+            'o_count': Lock()}
+    def get_o_count(self):
+        with self.locks['o_count']:
+            return self.o_count
+    def add_o_count(self, n = 1):
+        with self.locks['o_count']:
+            self.o_count += n
+    def get_current_net(self):
+        with self.locks['net']:
+            return copy.deepcopy(self.current_net_stat)
+    def set_current_net(self, n):
+        with self.locks['net']:
+            self.current_net_stat = n
     def get_network_conditions(self):return self.net_stats
     def is_PID_enabled(self): return self.PID_enabled
     def get_p(self): return self.p
