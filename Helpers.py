@@ -1,6 +1,6 @@
 import cv2, copy, time, configparser, csv
 from threading import Lock
-from simple_pid import PID
+from CustomPID import PID
 
 on_pi = True
 
@@ -152,9 +152,10 @@ class Offload_Controller(object):
         if tps == None or not self.config.is_PID_enabled(): return
         ofps = self.config.get_offload_fps()
         ratio = ofps / (ofps - tps + 1)
-        new_ofps = round(self.controller(ratio))
-        if new_ofps == 0: new_ofps = 1
+        new_ofps = self.controller(ratio, ofps)
         print('new ofps:', new_ofps)
+        if new_ofps < 1: new_ofps = 1
+        #print('new ofps:', new_ofps)
         self.config.set_offload_fps(new_ofps)
 
 class VideoSource(object):
