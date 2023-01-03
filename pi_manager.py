@@ -61,7 +61,7 @@ def measure_and_control(config, done, controller, stats_arr):
 
         stats = {'time': time.time() - st,\
             'fps': fps, 'tps': tps, 'cpu': cpu, 'ops': config.get_offload_fps(),\
-            'offload_fps': config.get_o_count()}
+            'offload_count': config.get_o_count()}
         net = config.get_current_net()
         if not net == None:
             stats.update(config.get_current_net())
