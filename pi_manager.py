@@ -13,7 +13,7 @@ def request_offload(request, q, config, url='http://localhost:1234/infer'):
             'image': request.image}, data = {'model': request.model}, timeout=config.get_latency_timeout())
         lat = time.time() - t
         data = literal_eval(req.content.decode())
-
+        print(lat)
         q.put(Res(request.id, data[:-1],False, lat))
     except Exception as E: #requests.exceptions.Timeout as T:
         lat = time.time() - t
@@ -34,7 +34,8 @@ def process_results(q, arr, num_to_test):
         result = q.get()
         arr[result.id] = result
 
-def change_network(config, done):
+def change_network(config, start, done):
+    start.wait()
     for change in config.get_network_conditions():
         if done.is_set(): break
         #use -1 to disable
@@ -48,7 +49,8 @@ def change_network(config, done):
         time.sleep(float(change['wait_time']))
 
 
-def measure_and_control(config, done, controller, stats_arr):
+def measure_and_control(config, start, done, controller, stats_arr):
+    start.wait()
     d = 1 / config.get_measure_rate()
     st = time.time()
     cpu = None
@@ -91,9 +93,10 @@ def main(config_file):
 
     #an event that tells the measure and net threads to stop
     done_event = threading.Event()
+    start_event = threading.Event()
 
     net_thread = threading.Thread(target=change_network,\
-        args=(config, done_event))
+        args=(config, start_event, done_event))
     #image capture process
     cap_proc = multiprocessing.Process(target=capture_loop, \
         args=(image_queue, num_to_test, shape))
@@ -118,7 +121,7 @@ def main(config_file):
         #runs in this process
     results_arr = []
     measure_thread = threading.Thread(target=measure_and_control, args=(config,\
-        done_event, controller, results_arr))
+        start_event, done_event, controller, results_arr))
 
     #warm up local processing
     pull_from_queue_event.set()
@@ -129,16 +132,21 @@ def main(config_file):
 
     cap_proc.start()
     res_thread.start()
-    print('STARTING')
+    
 
     last_offload = time.time()
 
     offload_threads = []
     measure_thread.start()
     net_thread.start()
-    start_time = time.time()
 
+
+    time.sleep(2)
+    print('STARTING')
+    start_event.set()
+    start_time = time.time()
     #process images
+    start_event.set()
     while config.get_procs() < num_to_test:
         t_since_last_offload = time.time() - last_offload
         need_to_wait = False
@@ -186,6 +194,7 @@ def main(config_file):
     #this FPS is not entirely accurate, the measured fps is more accurate
     print("Total time:", total_time, "FPS =", num_to_test / total_time)
     print("Offload %:", config.get_o_count() / num_to_test)
+    print("offload:", config.get_o_count(), "timeouts:", config.get_timeouts())
     #print(results_arr)
 
     with open('metrics/' + str(time.time()) + '.csv', 'w', newline='') as csvfile:

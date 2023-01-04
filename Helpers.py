@@ -1,8 +1,8 @@
 import cv2, copy, time, configparser, csv
 from threading import Lock
-from CustomPID import PID
+from simple_pid import PID
 
-on_pi = True
+on_pi = False
 
 images_path = "/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG" if on_pi else \
     "/Users/mnj98/ImageNet/ILSVRC2012_img_val/ILSVRC2012_val_%08d.JPEG"
@@ -56,7 +56,8 @@ class Config(object):
             self.o_count += n
     def get_current_net(self):
         with self.locks['net']:
-            return copy.deepcopy(self.current_net_stat)
+            return copy.deepcopy(self.current_net_stat) if self.current_net_stat else \
+                {'rate': '0','loss': '0','latency':'0','jitter': '0'}
     def set_current_net(self, n):
         with self.locks['net']:
             self.current_net_stat = n
@@ -141,22 +142,25 @@ class Config(object):
 class Offload_Controller(object):
     def __init__(self, config: Config):
         self.config = config
+        fps = self.config.get_source_fps()
         self.controller = PID(self.config.get_p(),\
             self.config.get_i(),\
             self.config.get_d(),\
-            setpoint=self.config.get_set_point())
-        self.controller.output_limits = (0, self.config.get_source_fps())
+            setpoint=fps)
+        self.controller.output_limits = (-0.5*fps,0.1*fps)
         self.controller.sample_time = None
     
     def control_and_update(self, tps):
         if tps == None or not self.config.is_PID_enabled(): return
         ofps = self.config.get_offload_fps()
-        ratio = ofps / (ofps - tps + 1)
-        new_ofps = self.controller(ratio, ofps)
+        fps = self.config.get_source_fps()
+        #ratio = ofps / (ofps - ((1/self.config.get_source_fps()) *tps) + self.config.get_set_point())
+        pv = ofps if tps <= 0 else ((tps*ofps/fps) + fps)
+        new_ofps = self.controller(pv, ofps)
         print('new ofps:', new_ofps)
-        if new_ofps < 1: new_ofps = 1
+        #if new_ofps < 1: new_ofps = 1
         #print('new ofps:', new_ofps)
-        self.config.set_offload_fps(new_ofps)
+        self.config.set_offload_fps(ofps + (new_ofps/self.config.get_measure_rate()))
 
 class VideoSource(object):
     def __init__(self, shape):
