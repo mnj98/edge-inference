@@ -2,7 +2,7 @@ import cv2, copy, time, configparser, csv
 from threading import Lock
 from simple_pid import PID
 
-on_pi = False
+on_pi = True
 
 images_path = "/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG" if on_pi else \
     "/Users/mnj98/ImageNet/ILSVRC2012_img_val/ILSVRC2012_val_%08d.JPEG"
@@ -122,6 +122,7 @@ class Config(object):
         if n == None:
             n = self.sfps
         with self.locks['fps']:
+            if n < 1: n = 1
             self.ofps = n
     def get_offload_fps(self):
         with self.locks['fps']:
@@ -155,8 +156,8 @@ class Offload_Controller(object):
         ofps = self.config.get_offload_fps()
         fps = self.config.get_source_fps()
         #ratio = ofps / (ofps - ((1/self.config.get_source_fps()) *tps) + self.config.get_set_point())
-        pv = ofps if tps <= 0 else ((tps*ofps/fps) + fps)
-        new_ofps = self.controller(pv, ofps)
+        pv = ofps if tps <= 0 else ((tps) + fps)
+        new_ofps = self.controller(pv)
         print('new ofps:', new_ofps)
         #if new_ofps < 1: new_ofps = 1
         #print('new ofps:', new_ofps)
