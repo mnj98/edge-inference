@@ -38,6 +38,7 @@ class Config(object):
         self.net_stats = net_stats
         self.current_net_stat = None
         self.o_count = 0
+        self.res_count = 0
 
         self.locks = {'fps': Lock(),\
             'mps': Lock(),\
@@ -47,7 +48,8 @@ class Config(object):
             'pps': Lock(),\
             'tps': Lock(),\
             'net': Lock(),\
-            'o_count': Lock()}
+            'o_count': Lock(),\
+            'res_count': Lock()}
     def get_o_count(self):
         with self.locks['o_count']:
             return self.o_count
@@ -72,17 +74,20 @@ class Config(object):
     def get_model(self): return self.model
     def get_latency_timeout(self): return self.timeout
     def get_source_fps(self): return self.sfps
+    def add_result_count(self, n = 1):
+        with self.locks['res_count']:
+            self.res_count += n
     def measure_and_report_fps(self):
         with self.locks['pps']:
-            with self.locks['proc']:
+            with self.locks['res_count']:
                 if len(self.pps) < 1:
-                    self.pps.append((self.proc_count, time.time()))
+                    self.pps.append((self.res_count, time.time()))
                     return None
-                delta_p = self.proc_count - self.pps[-1][0]
+                delta_p = self.res_count - self.pps[-1][0]
                 t = time.time()
                 delta_t = t - self.pps[-1][1]
                 fps = delta_p / delta_t
-                self.pps.append((self.proc_count, t))
+                self.pps.append((self.res_count, t))
                 return fps
     def measure_and_report_tps(self):
         with self.locks['tps']:
@@ -122,11 +127,13 @@ class Config(object):
         if n == None:
             n = self.sfps
         with self.locks['fps']:
-            if n < 1: n = 1
-            self.ofps = n
+            sfps = self.get_source_fps()
+            new_ofps = n if n < sfps else sfps
+            print("new ofps:", new_ofps)
+            self.ofps = new_ofps
     def get_offload_fps(self):
         with self.locks['fps']:
-            return self.ofps
+            return self.ofps if self.ofps > 0 else 0.0001
     def add_proc(self, n = 1):
         with self.locks['proc']:
             self.proc_count += n
@@ -148,7 +155,7 @@ class Offload_Controller(object):
             self.config.get_i(),\
             self.config.get_d(),\
             setpoint=fps)
-        self.controller.output_limits = (-0.5*fps,0.1*fps)
+        self.controller.output_limits = (-1*fps,0.1*fps)
         self.controller.sample_time = None
     
     def control_and_update(self, tps):
@@ -158,10 +165,11 @@ class Offload_Controller(object):
         #ratio = ofps / (ofps - ((1/self.config.get_source_fps()) *tps) + self.config.get_set_point())
         pv = ofps if tps <= 0 else ((tps) + fps)
         new_ofps = self.controller(pv)
-        print('new ofps:', new_ofps)
+        change = new_ofps/self.config.get_measure_rate()
+        print('change of ofps:', change)
         #if new_ofps < 1: new_ofps = 1
         #print('new ofps:', new_ofps)
-        self.config.set_offload_fps(ofps + (new_ofps/self.config.get_measure_rate()))
+        self.config.set_offload_fps(ofps + change)
 
 class VideoSource(object):
     def __init__(self, shape):

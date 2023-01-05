@@ -29,10 +29,12 @@ def capture_loop(q, num_to_test, shape, model = 'mobilenet'):
         req.model = model
         q.put(req)
 
-def process_results(q, arr, num_to_test):
+def process_results(q, arr, num_to_test, config):
     for i in range(num_to_test):
         result = q.get()
         arr[result.id] = result
+        if result.success:
+            config.add_result_count()
 
 def change_network(config, start, done):
     start.wait()
@@ -114,7 +116,7 @@ def main(config_file):
 
     #a thread that collects results
     res_thread = threading.Thread(target=process_results,\
-        args=(res_queue, results_arr, num_to_test))
+        args=(res_queue, results_arr, num_to_test, config))
 
 
     #the measurement and controlling thread
@@ -196,14 +198,14 @@ def main(config_file):
     print("Offload %:", config.get_o_count() / num_to_test)
     print("offload:", config.get_o_count(), "timeouts:", config.get_timeouts())
     #print(results_arr)
+    if not not len(results_arr):
+        with open('metrics/' + str(time.time()) + '.csv', 'w', newline='') as csvfile:
+            fieldnames = results_arr[0].keys()
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
-    with open('metrics/' + str(time.time()) + '.csv', 'w', newline='') as csvfile:
-        fieldnames = results_arr[0].keys()
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-        writer.writeheader()
-        for r in results_arr:
-            writer.writerow(r)
+            writer.writeheader()
+            for r in results_arr:
+                writer.writerow(r)
 
     #kill local processing 
     local_infer_proc.kill()
