@@ -1,20 +1,26 @@
 from Helpers import VideoSource as Source
 from Helpers import inf_response as Res
+from Helpers import inf_request as Req
 from Helpers import Config, Offload_Controller
 import multiprocessing, time, threading, requests, sys, os, psutil, csv
 from pi_local_infer import infer_loop
 import numpy as np
 from ast import literal_eval
 
-def request_offload(request, q, config, url='http://localhost:1234/infer'):
+def request_offload(request: Req, q, config: Config, url='http://localhost:1234/infer'):
     t = time.time()
     try:
         req = requests.post(url, files = {\
             'image': request.image}, data = {'model': request.model}, timeout=config.get_latency_timeout())
-        lat = time.time() - t
-        data = literal_eval(req.content.decode())
-        print(lat)
-        q.put(Res(request.id, data[:-1],False, lat))
+        if req.status_code == 503:
+            print('failed: server rejection')
+            config.add_timeout()
+            q.put(Res(request.id,None, False, time.time() - t, False))
+        else:
+            lat = time.time() - t
+            data = literal_eval(req.content.decode())
+            #print(lat)
+            q.put(Res(request.id, data[:-1],False, lat))
     except Exception as E: #requests.exceptions.Timeout as T:
         lat = time.time() - t
         print('failed', E)
@@ -51,7 +57,7 @@ def change_network(config, start, done):
         time.sleep(float(change['wait_time']))
 
 
-def measure_and_control(config, start, done, controller, stats_arr):
+def measure_and_control(config: Config, start, done, controller, stats_arr):
     start.wait()
     d = 1 / config.get_measure_rate()
     st = time.time()
@@ -65,7 +71,8 @@ def measure_and_control(config, start, done, controller, stats_arr):
 
         stats = {'time': time.time() - st,\
             'fps': fps, 'tps': tps, 'cpu': cpu, 'ops': config.get_offload_fps(),\
-            'offload_count': config.get_o_count()}
+            'offload_count': config.get_o_count(),\
+            'p':config.get_p(),'i':config.get_i(),'d':config.get_d()}
         net = config.get_current_net()
         if not net == None:
             stats.update(config.get_current_net())
@@ -111,7 +118,7 @@ def main(config_file):
     #local inference process
     local_infer_proc = multiprocessing.Process( \
         target=infer_loop, args=(image_queue, res_queue,\
-        infer_ready, pull_from_queue_event))
+        infer_ready, pull_from_queue_event, config.model))
     local_infer_proc.start()
 
     #a thread that collects results

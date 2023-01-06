@@ -2,7 +2,7 @@ import cv2, copy, time, configparser, csv
 from threading import Lock
 from simple_pid import PID
 
-on_pi = True
+on_pi = False
 
 images_path = "/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG" if on_pi else \
     "/Users/mnj98/ImageNet/ILSVRC2012_img_val/ILSVRC2012_val_%08d.JPEG"
@@ -155,7 +155,7 @@ class Offload_Controller(object):
             self.config.get_i(),\
             self.config.get_d(),\
             setpoint=fps)
-        self.controller.output_limits = (-1*fps,0.1*fps)
+        self.controller.output_limits = (-1*fps,0.5*fps)
         self.controller.sample_time = None
     
     def control_and_update(self, tps):
@@ -163,7 +163,9 @@ class Offload_Controller(object):
         ofps = self.config.get_offload_fps()
         fps = self.config.get_source_fps()
         #ratio = ofps / (ofps - ((1/self.config.get_source_fps()) *tps) + self.config.get_set_point())
-        pv = ofps if tps <= 0 else ((tps) + fps)
+        pv = ofps if tps <= 0 else ((tps) + (0.9*fps))
+        #pv = ofps if tps <= 0 else ((ofps + tps))
+        #pv = ofps - tps
         new_ofps = self.controller(pv)
         change = new_ofps/self.config.get_measure_rate()
         print('change of ofps:', change)
