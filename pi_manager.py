@@ -2,7 +2,7 @@ from Helpers import VideoSource as Source
 from Helpers import inf_response as Res
 from Helpers import inf_request as Req
 from Helpers import Config, Offload_Controller
-import multiprocessing, time, threading, requests, sys, os, psutil, csv
+import multiprocessing, time, threading, requests, sys, os, psutil, csv, signal
 from pi_local_infer import infer_loop
 import numpy as np
 from ast import literal_eval
@@ -23,7 +23,7 @@ def request_offload(request: Req, q, config: Config, url='http://localhost:1234/
             q.put(Res(request.id, data[:-1],False, lat))
     except Exception as E: #requests.exceptions.Timeout as T:
         lat = time.time() - t
-        print('failed', E)
+        print('latency:', lat, 'failed', config.get_latency_timeout())
         config.add_timeout()
         q.put(Res(request.id, None, False, lat, False))
 
@@ -37,10 +37,14 @@ def capture_loop(q, num_to_test, shape, model = 'mobilenet'):
 
 def process_results(q, arr, num_to_test, config):
     for i in range(num_to_test):
-        result = q.get()
-        arr[result.id] = result
-        if result.success:
-            config.add_result_count()
+        try:
+            result = q.get(timeout=5)
+            arr[result.id] = result
+            if result.success:
+                config.add_result_count()
+        except:
+            print('res timeout')
+            continue
 
 def change_network(config, start, done):
     start.wait()
@@ -65,12 +69,14 @@ def measure_and_control(config: Config, start, done, controller, stats_arr):
     while not done.is_set():
         fps = config.measure_and_report_fps()
         print("FPS", fps)
-        tps = config.measure_and_report_tps()
+        tps, rolling_average = config.measure_and_report_tps(5)
         print("TPS", tps)
-        controller.control_and_update(tps)
+        print("rolling TPS average for the last 5 seconds:", rolling_average)
+        controller.control_and_update(rolling_average if rolling_average else tps)
 
         stats = {'time': time.time() - st,\
-            'fps': fps, 'tps': tps, 'cpu': cpu, 'ops': config.get_offload_fps(),\
+            'fps': fps, 'tps': tps,'tps_rolling_average': rolling_average,\
+            'cpu': cpu, 'ofps': config.get_offload_fps(True),\
             'offload_count': config.get_o_count(),\
             'p':config.get_p(),'i':config.get_i(),'d':config.get_d()}
         net = config.get_current_net()
@@ -161,7 +167,7 @@ def main(config_file):
         need_to_wait = False
         #if next images should be offloaded
         if config.is_offloading_enabled()\
-            and t_since_last_offload - (1/config.get_offload_fps()) > -0.003:
+            and t_since_last_offload - (1/config.get_offload_fps(True)) > -0.003:
 
             req = image_queue.get()
             last_offload = time.time()
@@ -205,6 +211,7 @@ def main(config_file):
     print("Offload %:", config.get_o_count() / num_to_test)
     print("offload:", config.get_o_count(), "timeouts:", config.get_timeouts())
     #print(results_arr)
+    
     if not not len(results_arr):
         with open('metrics/' + str(time.time()) + '.csv', 'w', newline='') as csvfile:
             fieldnames = results_arr[0].keys()
@@ -213,14 +220,13 @@ def main(config_file):
             writer.writeheader()
             for r in results_arr:
                 writer.writerow(r)
-
+    
     #kill local processing 
     local_infer_proc.kill()
     local_infer_proc.join()
     local_infer_proc.close()
     
     cap_proc.join()
-
 
 
 if __name__ == "__main__":
@@ -230,3 +236,4 @@ if __name__ == "__main__":
         config_file = 'default_config.ini'
     print(config_file)
     main(config_file)
+

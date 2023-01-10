@@ -2,7 +2,7 @@ import cv2, copy, time, configparser, csv
 from threading import Lock
 from simple_pid import PID
 
-on_pi = False
+on_pi = True
 
 images_path = "/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG" if on_pi else \
     "/Users/mnj98/ImageNet/ILSVRC2012_img_val/ILSVRC2012_val_%08d.JPEG"
@@ -89,18 +89,24 @@ class Config(object):
                 fps = delta_p / delta_t
                 self.pps.append((self.res_count, t))
                 return fps
-    def measure_and_report_tps(self):
+    def measure_and_report_tps(self, last=None):
         with self.locks['tps']:
             with self.locks['timeout']:
                 if len(self.tps) < 1:
                     self.tps.append((self.timeout_count, time.time()))
-                    return None
+                    return None, None
                 delta_timeout = self.timeout_count - self.tps[-1][0]
                 t = time.time()
                 delta_t = t - self.tps[-1][1]
                 tps = delta_timeout / delta_t
                 self.tps.append((self.timeout_count, t))
-                return tps
+                rolling_average = None
+                if last != None and last > 1 and len(self.tps) > last:
+                    dtimeout = self.tps[-1][0] - self.tps[-last][0]
+                    dt = self.tps[-1][1] - self.tps[-last][1]
+                    rolling_average = dtimeout / dt
+                print(tps, rolling_average)
+                return tps, rolling_average
 
     def get_proc_rates(self):
         with self.locks['pps']:
@@ -131,9 +137,11 @@ class Config(object):
             new_ofps = n if n < sfps else sfps
             print("new ofps:", new_ofps)
             self.ofps = new_ofps
-    def get_offload_fps(self):
+    def get_offload_fps(self, zero_min = False):
         with self.locks['fps']:
-            return self.ofps if self.ofps > 0 else 0.0001
+            if zero_min:
+                return self.ofps if self.ofps > 0 else 0.0001
+            return self.ofps
     def add_proc(self, n = 1):
         with self.locks['proc']:
             self.proc_count += n
@@ -155,7 +163,7 @@ class Offload_Controller(object):
             self.config.get_i(),\
             self.config.get_d(),\
             setpoint=fps)
-        self.controller.output_limits = (-1*fps,0.5*fps)
+        #self.controller.output_limits = (-1*fps,0.5*fps)
         self.controller.sample_time = None
     
     def control_and_update(self, tps):
@@ -168,6 +176,8 @@ class Offload_Controller(object):
         #pv = ofps - tps
         new_ofps = self.controller(pv)
         change = new_ofps/self.config.get_measure_rate()
+        if change > fps / 10: change = fps / 10
+        if change < -1.0 * fps / 2: change = -1.0 * fps / 2
         print('change of ofps:', change)
         #if new_ofps < 1: new_ofps = 1
         #print('new ofps:', new_ofps)
