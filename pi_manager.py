@@ -13,7 +13,7 @@ def request_offload(request: Req, q, config: Config, url='http://localhost:1234/
         req = requests.post(url, files = {\
             'image': request.image}, data = {'model': request.model}, timeout=config.get_latency_timeout())
         if req.status_code == 503:
-            print('failed: server rejection')
+            #print('failed: server rejection')
             config.add_timeout()
             q.put(Res(request.id,None, False, time.time() - t, False))
         else:
@@ -23,7 +23,7 @@ def request_offload(request: Req, q, config: Config, url='http://localhost:1234/
             q.put(Res(request.id, data[:-1],False, lat))
     except Exception as E: #requests.exceptions.Timeout as T:
         lat = time.time() - t
-        print('latency:', lat, 'failed', config.get_latency_timeout())
+        #print('latency:', lat, 'failed', config.get_latency_timeout())
         config.add_timeout()
         q.put(Res(request.id, None, False, lat, False))
 
@@ -60,18 +60,58 @@ def change_network(config, start, done):
         os.system('sh update_net.sh ' + rate + loss + delay + jitter)
         time.sleep(float(change['wait_time']))
 
-
-def measure_and_control(config: Config, start, done, controller, stats_arr):
+def interval_measure_and_control(config: Config, start, done, stats_arr, image_queue,\
+        res_queue, offload_threads):
     start.wait()
     d = 1 / config.get_measure_rate()
     st = time.time()
     cpu = None
     while not done.is_set():
         fps = config.measure_and_report_fps()
-        print("FPS", fps)
         tps, rolling_average = config.measure_and_report_tps(5)
-        print("TPS", tps)
-        print("rolling TPS average for the last 5 seconds:", rolling_average)
+        
+        print('FPS:',fps,'TPS:',tps,'TPS average (5 updates)',rolling_average)
+
+        timeout_start = time.time()
+        offload_frame(config, image_queue, res_queue, offload_threads, wait_for_join=True)
+        if time.time() - timeout_start > config.get_latency_timeout():
+            print("offloading disabled")
+            config.disable_offloading()
+        else:
+            print("offloading enabled")
+            config.enable_offloading()
+
+
+        stats = {'time': time.time() - st,\
+            'fps': fps, 'tps': tps,'tps_rolling_average': rolling_average,\
+            'cpu': cpu, 'ofps': config.get_offload_fps(True),\
+            'offload_count': config.get_o_count(),\
+            'p':config.get_p(),'i':config.get_i(),'d':config.get_d()}
+        net = config.get_current_net()
+        if not net == None:
+            stats.update(config.get_current_net())
+            if None in stats.values():
+                print('Stats not ready')
+            else:
+                stats_arr.append(stats)
+
+
+        wait = d - ((time.time() - st) % d)
+        #waits for wait and count CPU usage
+        cpu = psutil.cpu_percent(wait)
+
+def PID_measure_and_control(config: Config, start, done, controller, stats_arr):
+    start.wait()
+    d = 1 / config.get_measure_rate()
+    st = time.time()
+    cpu = None
+    while not done.is_set():
+        fps = config.measure_and_report_fps()
+        #print("FPS", fps)
+        tps, rolling_average = config.measure_and_report_tps(5)
+        #print("TPS", tps)
+        #print("rolling TPS average for the last 5 updates:", rolling_average)
+        print('FPS:',fps,'TPS:',tps,'TPS average (5 updates)',rolling_average)
         controller.control_and_update(rolling_average if rolling_average else tps)
 
         stats = {'time': time.time() - st,\
@@ -83,13 +123,25 @@ def measure_and_control(config: Config, start, done, controller, stats_arr):
         if not net == None:
             stats.update(config.get_current_net())
             if None in stats.values():
-                print('Stats not ready:', stats)
+                print('Stats not ready')
             else:
                 stats_arr.append(stats)
 
         wait = d - ((time.time() - st) % d)
         #waits for wait and count CPU usage
         cpu = psutil.cpu_percent(wait)
+
+def offload_frame(config, image_queue, res_queue, offload_threads, wait_for_join = False):
+    print('offload')
+    req = image_queue.get()
+    last_offload = time.time()
+    config.add_proc()
+    config.add_o_count()
+    thread = threading.Thread(target=request_offload, args=(req, res_queue, config))
+    thread.start()
+    offload_threads.append(thread)
+    if wait_for_join: thread.join()
+    return last_offload
 
 def main(config_file):
     #create and parse config file
@@ -127,16 +179,26 @@ def main(config_file):
         infer_ready, pull_from_queue_event, config.model))
     local_infer_proc.start()
 
+
+
     #a thread that collects results
     res_thread = threading.Thread(target=process_results,\
         args=(res_queue, results_arr, num_to_test, config))
+
+    offload_threads = []
+#interval_measure_and_control(config: Config, start, done, stats_arr, image_queue,\
+ #       res_queue, offload_threads, timeout):
 
 
     #the measurement and controlling thread
         #runs in this process
     results_arr = []
-    measure_thread = threading.Thread(target=measure_and_control, args=(config,\
-        start_event, done_event, controller, results_arr))
+    if config.interval_control:
+        measure_thread = threading.Thread(target=interval_measure_and_control, args = (config,\
+            start_event, done_event, results_arr, image_queue, res_queue, offload_threads))
+    else:
+        measure_thread = threading.Thread(target=PID_measure_and_control, args=(config,\
+            start_event, done_event, controller, results_arr))
 
     #warm up local processing
     pull_from_queue_event.set()
@@ -151,7 +213,7 @@ def main(config_file):
 
     last_offload = time.time()
 
-    offload_threads = []
+    
     measure_thread.start()
     net_thread.start()
 
@@ -169,18 +231,12 @@ def main(config_file):
         if config.is_offloading_enabled()\
             and t_since_last_offload - (1/config.get_offload_fps(True)) > -0.003:
 
-            req = image_queue.get()
-            last_offload = time.time()
-            config.add_proc()
-            config.add_o_count()
-            thread = threading.Thread(target=request_offload, args=(req, res_queue, config))
-            thread.start()
-            offload_threads.append(thread)
+            last_offload = offload_frame(config, image_queue, res_queue, offload_threads)
             need_to_wait = True
 
         #If the next frame can be processed locally
         elif infer_ready.is_set() and \
-            ((1/config.get_offload_fps()) > frame_delay\
+            ((1/config.get_offload_fps(True)) > frame_delay\
             or not config.is_offloading_enabled()):
 
             config.add_proc()

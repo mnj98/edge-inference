@@ -2,7 +2,7 @@ import cv2, copy, time, configparser, csv
 from threading import Lock
 from simple_pid import PID
 
-on_pi = True
+on_pi = False
 
 images_path = "/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG" if on_pi else \
     "/Users/mnj98/ImageNet/ILSVRC2012_img_val/ILSVRC2012_val_%08d.JPEG"
@@ -19,12 +19,19 @@ class Config(object):
         self.ofps = parser.getint('Controller', 'initial_offloading_rate')
         self.sfps = parser.getint('Video Source', 'fps')
         self.mps = parser.getfloat('Controller', 'measure_rate')
+        self.PID_enabled = parser.getboolean('Controller', 'enable_pid')
         self.enabled = parser.getboolean('Controller', 'enable_offloading')
+        self.interval_control = parser.getboolean('Controller', 'time_interval_control')
+        if self.interval_control:
+            self.ofps = self.sfps
+            self.enabled = False
+            self.PID_enabled = False
+
         size = parser.getint('Video Source', 'size')
         self.shape = (size, size)
         [self.p, self.i, self.d] = [parser.getfloat('Controller', j) for j in ['p', 'i', 'd']]
         self.set_point = parser.getfloat('Controller', 'set_point')
-        self.PID_enabled = parser.getboolean('Controller', 'enable_pid')
+        
 
         self.proc_count = 0
         self.timeout_count = 0
