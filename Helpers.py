@@ -112,7 +112,7 @@ class Config(object):
                     dtimeout = self.tps[-1][0] - self.tps[-last][0]
                     dt = self.tps[-1][1] - self.tps[-last][1]
                     rolling_average = dtimeout / dt
-                print(tps, rolling_average)
+                
                 return tps, rolling_average
 
     def get_proc_rates(self):
@@ -142,7 +142,7 @@ class Config(object):
         with self.locks['fps']:
             sfps = self.get_source_fps()
             new_ofps = n if n < sfps else sfps
-            print("new ofps:", new_ofps)
+            #print("new ofps:", new_ofps)
             self.ofps = new_ofps
     def get_offload_fps(self, zero_min = False):
         with self.locks['fps']:
@@ -185,7 +185,7 @@ class Offload_Controller(object):
         change = new_ofps/self.config.get_measure_rate()
         if change > fps / 10: change = fps / 10
         if change < -1.0 * fps / 2: change = -1.0 * fps / 2
-        print('change of ofps:', change)
+        #print('change of ofps:', change)
         #if new_ofps < 1: new_ofps = 1
         #print('new ofps:', new_ofps)
         self.config.set_offload_fps(ofps + change)

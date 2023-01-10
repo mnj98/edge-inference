@@ -75,11 +75,13 @@ def interval_measure_and_control(config: Config, start, done, stats_arr, image_q
         timeout_start = time.time()
         offload_frame(config, image_queue, res_queue, offload_threads, wait_for_join=True)
         if time.time() - timeout_start > config.get_latency_timeout():
-            print("offloading disabled")
+            #print("offloading disabled")
             config.disable_offloading()
+            config.set_offload_fps(0)
         else:
-            print("offloading enabled")
+            #print("offloading enabled")
             config.enable_offloading()
+            config.set_offload_fps(config.get_source_fps())
 
 
         stats = {'time': time.time() - st,\
@@ -132,7 +134,6 @@ def PID_measure_and_control(config: Config, start, done, controller, stats_arr):
         cpu = psutil.cpu_percent(wait)
 
 def offload_frame(config, image_queue, res_queue, offload_threads, wait_for_join = False):
-    print('offload')
     req = image_queue.get()
     last_offload = time.time()
     config.add_proc()
