@@ -161,7 +161,7 @@ def main(config_file):
         args=(config, start_event, done_event))
     #image capture process
     cap_proc = multiprocessing.Process(target=capture_loop, \
-        args=(image_queue, num_to_test, shape))
+        args=(image_queue, num_to_test, shape, config.model))
 
     #event that tells the local processing process to grab an image
     pull_from_queue_event = multiprocessing.Event()
