@@ -4,9 +4,9 @@ from simple_pid import PID
 
 on_pi = False
 
-images_path = "/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG" if on_pi else \
-    "/Users/mnj98/ImageNet/ILSVRC2012_img_val/ILSVRC2012_val_%08d.JPEG"
-
+#images_path = "/home/pi/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG" if on_pi else \
+#    "/Users/mnj98/ImageNet/ILSVRC2012_img_val/ILSVRC2012_val_%08d.JPEG"
+images_path = "/home/mnj98/ImageNet/2012/val/ILSVRC2012_val_%08d.JPEG"
 
 class Config(object):
     def __init__(self, file):
@@ -96,7 +96,7 @@ class Config(object):
                 fps = delta_p / delta_t
                 self.pps.append((self.res_count, t))
                 return fps
-    def measure_and_report_tps(self, last=None):
+    def measure_and_report_tps(self, last=5):
         with self.locks['tps']:
             with self.locks['timeout']:
                 if len(self.tps) < 1:
@@ -108,11 +108,11 @@ class Config(object):
                 tps = delta_timeout / delta_t
                 self.tps.append((self.timeout_count, t))
                 rolling_average = None
-                if last != None and last > 1 and len(self.tps) > last:
-                    dtimeout = self.tps[-1][0] - self.tps[-last][0]
-                    dt = self.tps[-1][1] - self.tps[-last][1]
-                    rolling_average = dtimeout / dt
-                
+                if last > len(self.tps): last = len(self.tps)
+                dtimeout = self.tps[-1][0] - self.tps[-last][0]
+                dt = self.tps[-1][1] - self.tps[-last][1]
+                rolling_average = dtimeout / dt
+
                 return tps, rolling_average
 
     def get_proc_rates(self):

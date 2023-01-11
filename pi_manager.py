@@ -92,10 +92,7 @@ def interval_measure_and_control(config: Config, start, done, stats_arr, image_q
         net = config.get_current_net()
         if not net == None:
             stats.update(config.get_current_net())
-            if None in stats.values():
-                print('Stats not ready')
-            else:
-                stats_arr.append(stats)
+            stats_arr.append(stats)
 
 
         wait = d - ((time.time() - st) % d)
@@ -124,10 +121,7 @@ def PID_measure_and_control(config: Config, start, done, controller, stats_arr):
         net = config.get_current_net()
         if not net == None:
             stats.update(config.get_current_net())
-            if None in stats.values():
-                print('Stats not ready')
-            else:
-                stats_arr.append(stats)
+            stats_arr.append(stats)
 
         wait = d - ((time.time() - st) % d)
         #waits for wait and count CPU usage
