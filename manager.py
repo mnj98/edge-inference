@@ -50,7 +50,7 @@ def flask_thread():
         events.put(e)
         r = results.pop(image_id)
         #print(r)
-        return r + [time.time() - t] if r else (r, 503)
+        return r + [time.time() - t] if r else ("timeout", 503)
     
     app.run(host='0.0.0.0', threaded=True,  port=1234)
 
