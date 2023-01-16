@@ -243,6 +243,9 @@ def main(config_file):
         if need_to_wait:
             wait = frame_delay - ((time.time() - start_time) % frame_delay)
             time.sleep(wait)
+        else:
+            wait = (frame_delay / 10) - ((time.time() - start_time) % (frame_delay / 10))
+            time.sleep(wait)
     print("DONE")
     #wait until all results are in
     res_thread.join()
