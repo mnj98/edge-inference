@@ -49,8 +49,8 @@ def flask_thread():
         e.clear()
         events.put(e)
         r = results.pop(image_id)
-        print(r)
-        return r + [time.time() - t]
+        #print(r)
+        return r + [time.time() - t] if r else ("timeout", 503)
     
     app.run(host='0.0.0.0', threaded=True,  port=1234)
 
@@ -88,7 +88,7 @@ NUM_EVENTS = 3000
 def det_thread(model_name, BATCH_SIZE):
     batch_n = 0
     while True:
-        print(model_name,': batch number:', batch_n)
+        #print(model_name,': batch number:', batch_n)
         batch_n += 1
         batch = []
 
@@ -129,7 +129,7 @@ def inference_thread(model_name, BATCH_SIZE):
         local.q_size = requests[model_name].qsize()
         local.batch_collect_start_time = time.time()
         for i in range(local.q_size): #while (time.time() - local.batch_collect_start_time) < BATCH_TIME_ESTIMATE or local.idx == 0: #while local.idx < BATCH_SIZE:
-            if local.idx > 0: print(time.time() - local.batch_collect_start_time)
+            #if local.idx > 0: print(time.time() - local.batch_collect_start_time)
             try:
                 local.r = requests[model_name].get(False) #(timeout=BATCH_TIME_ESTIMATE + 0.005)
                 local.batch.append(local.r)
@@ -153,9 +153,15 @@ def inference_thread(model_name, BATCH_SIZE):
             for i in range(len(local.batch)):
                 results[local.batch_ids[i]] = 'ok!'#(boxes[i], scores[i], classes[i], num_detections[i])
                 local.batch_events[i].set()
-            print('batch time:', time.time() - local.t)
+            #print('batch time:', time.time() - local.t)
 
         else:
+            max_batch_size = 15
+            local.rejected_requests = local.batch[max_batch_size:]
+            local.batch = local.batch[:max_batch_size]
+            for i in range(len(local.rejected_requests)):
+                results[local.rejected_requests[i]['id']] = None
+                local.rejected_requests[i]['done_event'].set()
             local.batch_images = np.array(list(map(lambda img: img['image'], local.batch)))
             local.batch_events = list(map(lambda img: img['done_event'], local.batch))
             local.batch_ids = list(map(lambda img: img['id'], local.batch))
@@ -163,14 +169,14 @@ def inference_thread(model_name, BATCH_SIZE):
             local.frames = processing_functions[model_name](local.batch_images)
             local.pred_time = time.time()
             local.preds = decode_functions[model_name](models[model_name].predict_on_batch(local.frames), top = 5)
-            print('pred_time', time.time() - local.pred_time)
+            #print('pred_time', time.time() - local.pred_time)
             #print('preds',preds)
             #print(decode_predictions(preds, top=5))
 
             for i in range(len(local.batch)):
                 results[local.batch_ids[i]] = list(map(lambda pr: int(pr[0][1:]),local.preds[i]))
                 local.batch_events[i].set()
-            print('batch time:', time.time() - local.t)
+            #print('batch time:', time.time() - local.t)
 
 def main():
     for i in range(NUM_EVENTS):
