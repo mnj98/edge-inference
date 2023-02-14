@@ -42,7 +42,7 @@ def flask_thread():
         image = np.frombuffer(image, np.uint8)
         image = cv2.imdecode(image, cv2.IMREAD_COLOR)
 
-    
+        if model_to_use == "efficientnet": image = cv2.resize(image, (380,380))
         e = events.get()
         requests[model_to_use].put({'id': image_id, 'done_event': e, 'image': image})
         e.wait()
@@ -57,7 +57,7 @@ def flask_thread():
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 if not args.debug:
-    from tensorflow.keras.applications import  EfficientNetB0
+    from tensorflow.keras.applications import  EfficientNetB4
 from tensorflow.keras.applications import MobileNetV3Large
 import tensorflow.keras.applications.mobilenet_v3 as mobilenet
 if not args.debug:
@@ -70,7 +70,7 @@ if not args.debug:
     keras_model_names = ['mobilenet', 'efficientnet']
     processing_functions = {'mobilenet': mobilenet.preprocess_input, 'efficientnet': efficientnet.preprocess_input}
     decode_functions = {'mobilenet': mobilenet.decode_predictions, 'efficientnet': efficientnet.decode_predictions}
-    models = {'mobilenet': MobileNetV3Large(weights='imagenet'), 'efficientnet': EfficientNetB0(weights='imagenet'),\
+    models = {'mobilenet': MobileNetV3Large(weights='imagenet'), 'efficientnet': EfficientNetB4(weights='imagenet'),\
             'efficient_det': hub.load(efficient_det_model)}
     requests = {'mobilenet': queue.Queue(), 'efficientnet': queue.Queue(), 'efficient_det': queue.Queue()}
 else:
