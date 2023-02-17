@@ -19,12 +19,12 @@ def request_offload(request: Req, q, config: Config, url='http://localhost:1234/
                 timeout=config.get_latency_timeout())
             lat = time.time() - t
             data = literal_eval(response.result)
-            #print(lat)
+            print(lat)
             q.put(Res(request.id, data[:-1],False, lat))
     except grpc.RpcError as e:
-        print(e.code())
+        #print(e.code())
         lat = time.time() - t
-        #print('latency:', lat, 'failed', config.get_latency_timeout())
+        print('latency:', lat, 'failed', config.get_latency_timeout())
         config.add_timeout()
         q.put(Res(request.id, None, False, lat, False))
 
