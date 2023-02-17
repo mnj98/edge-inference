@@ -7,7 +7,28 @@ from pi_local_infer import infer_loop
 import numpy as np
 from ast import literal_eval
 
+import grpc, offload_pb2, offload_pb2_grpc
+
 def request_offload(request: Req, q, config: Config, url='http://localhost:1234/infer'):
+    t = time.time()
+
+    try:
+        with grpc.insecure_channel('localhost:1234') as channel:
+            stub = offload_pb2_grpc.OffloaderStub(channel)
+            response = stub.offload(offload_pb2.ClientInput(image=request.image, model=request.model),\
+                timeout=config.get_latency_timeout())
+            lat = time.time() - t
+            data = literal_eval(response.result)
+            #print(lat)
+            q.put(Res(request.id, data[:-1],False, lat))
+    except grpc.RpcError as e:
+        print(e.code())
+        lat = time.time() - t
+        #print('latency:', lat, 'failed', config.get_latency_timeout())
+        config.add_timeout()
+        q.put(Res(request.id, None, False, lat, False))
+
+def old_request_offload(request: Req, q, config: Config, url='http://localhost:1234/infer'):
     t = time.time()
     try:
         req = requests.post(url, files = {\
