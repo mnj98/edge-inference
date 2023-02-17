@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+service Offloader {
+   rpc offload (ClientInput) returns (ServerOutput) {}
+}
+message ClientInput {
+   bytes image = 1;
+   string model = 2;
+}
+message ServerOutput {
+   string result = 1;
+}
