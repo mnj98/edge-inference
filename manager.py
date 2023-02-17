@@ -18,6 +18,38 @@ import cv2
 
 import logging
 logging.getLogger('werkzeug').disabled = True
+from concurrent import futures
+import grpc, offload_pb2, offload_pb2_grpc
+
+def grpc_server():
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    offload_pb2_grpc.add_OffloaderServicer_to_server(Offloader(), server)
+    server.add_insecure_port('[::]:1234')
+    print('========gRPC Starting======')
+    server.start()
+    server.wait_for_termination()
+
+class Offloader(offload_pb2_grpc.OffloaderServicer):
+    def offload(self, request, context):
+        image_id = random.random()
+        t = time.time()
+        image = np.frombuffer(request.image, np.uint8)
+        image = cv2.imdecode(image, cv2.IMREAD_COLOR)
+        model = request.model
+
+        if model == "efficientnet": image = cv2.resize(image, (380,380))
+        
+        e = events.get()
+        requests[model].put({'id': image_id, 'done_event': e, 'image': image})
+        e.wait()
+        e.clear()
+        events.put(e)
+        r = results.pop(image_id)
+
+        context.set_code(grpc.StatusCode.OK if r else grpc.StatusCode.ABORTED)
+        return offload_pb2.ServerOutput(result='{0}'.format(str(r + [time.time() - t])))
+        #print(r)
+        #return r + [time.time() - t] if r else ("timeout", 503)
 
 
 def flask_thread():
@@ -184,7 +216,7 @@ def main():
     if args.debug:
         print('----- debug mode -----')
         mob_thread = threading.Thread(target=inference_thread, args=('mobilenet', args.batchsize,))
-        server_thread = threading.Thread(target=flask_thread, args=())
+        server_thread = threading.Thread(target=grpc_server, args=())
         mob_thread.start()
         server_thread.start()
 
@@ -193,7 +225,7 @@ def main():
     
         detection_thread = threading.Thread(target=inference_thread, args=('efficient_det',args.batchsize,))
 
-        server_thread = threading.Thread(target=flask_thread, args=())
+        server_thread = threading.Thread(target=grpc_server, args=())
         detection_thread.start()
         for thread in keras_model_threads:
             thread.start()
